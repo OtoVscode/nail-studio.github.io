@@ -1,32 +1,32 @@
 # Nail Studio · Landing page
 
-Landing page de demostración para un salón de uñas: Hero, menú de servicios con pestañas, galería con visor, ubicación con mapa y botón flotante de WhatsApp.
+Demo landing page for a nail salon: hero, tabbed service menu, gallery with a lightbox viewer, location with a map, and a floating WhatsApp button.
 
-Es un solo archivo `index.html` (Tailwind CSS por CDN + Google Fonts), sin dependencias ni proceso de compilación.
+It's a single `index.html` file (Tailwind CSS via CDN + Google Fonts), with no dependencies or build step.
 
-## Ver en local
+## View locally
 
-Abre `index.html` con doble clic en cualquier navegador.
+Double-click `index.html` to open it in any browser.
 
-## Publicar con GitHub Pages
+## Publish with GitHub Pages
 
-1. En el repositorio, ve a **Settings → Pages**.
-2. En **Source** elige **Deploy from a branch**.
-3. Selecciona la rama `main` y la carpeta `/ (root)`, y pulsa **Save**.
-4. En 1–2 minutos la página estará en `https://TU-USUARIO.github.io/NOMBRE-DEL-REPO/`.
+1. In the repository, go to **Settings → Pages**.
+2. Under **Source**, choose **Deploy from a branch**.
+3. Select the `main` branch and the `/ (root)` folder, then click **Save**.
+4. In 1–2 minutes the site will be live at `https://YOUR-USERNAME.github.io/REPO-NAME/`.
 
-## Personalizar antes de entregar
+## Customize before handing off
 
-Busca y reemplaza en `index.html`:
+Find and replace in `index.html`:
 
-| Qué | Valor actual de ejemplo |
+| What | Current sample value |
 | --- | --- |
-| Número de WhatsApp | `5215512345678` |
-| Dirección | `Calle Orizaba 128` (texto, botón "Cómo llegar" y mapa) |
+| WhatsApp number | `5215512345678` |
+| Address | `Calle Orizaba 128` (text, "Get Directions" button and map) |
 | Instagram / TikTok | `https://www.instagram.com/` · `https://www.tiktok.com/` |
-| Precios y duraciones | Sección `#servicios` |
-| Fotos de la galería | Atributos `src` y `data-full` en `#galeria` |
+| Prices and durations | `#services` section |
+| Gallery photos | `src` and `data-full` attributes in `#gallery` |
 
-## Créditos
+## Credits
 
-Fotografías de [Unsplash](https://unsplash.com).
+Photos from [Unsplash](https://unsplash.com).
