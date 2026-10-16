@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="es" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nail Studio · Manicura y Arte en Uñas</title>
+  <meta name="description" content="Nail Studio: manicura, pedicura y nail art con acabado impecable. Reserva tu cita por WhatsApp." />
+  <meta name="theme-color" content="#FAF7F5" />
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+
+  <!-- Vista previa al compartir el enlace (WhatsApp, redes) -->
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Nail Studio · Manicura y Arte en Uñas" />
+  <meta property="og:description" content="Manicura, pedicura spa y uñas acrílicas en Roma Norte. Agenda tu cita por WhatsApp." />
+  <meta property="og:image" content="https://images.unsplash.com/photo-1604654894610-df63bc536371?auto=format&fit=crop&w=1200&h=630&q=80" />
+  <meta name="twitter:card" content="summary_large_image" />
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            cream: '#FAF7F5',
+            nude: '#F1E7E1',
+            rose: { DEFAULT: '#E5989B', dark: '#D4787C', soft: '#F6DCDD' },
+            sand: '#D4A373',
+            ink: '#2B2B2B',
+          },
+          fontFamily: {
+            serif: ['"Playfair Display"', 'Georgia', 'serif'],
+            sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+          },
+          transitionTimingFunction: {
+            'out-strong': 'cubic-bezier(0.23, 1, 0.32, 1)',
+            'in-out-strong': 'cubic-bezier(0.77, 0, 0.175, 1)',
+          },
+          boxShadow: {
+            soft: '0 10px 30px -12px rgba(43, 43, 43, 0.18)',
+            rose: '0 12px 28px -10px rgba(229, 152, 155, 0.65)',
+          },
+        },
+      },
+    };
+  </script>
+
+  <style>
+    :root {
+      --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+    }
+
+    body {
+      -webkit-font-smoothing: antialiased;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* Botones: feedback al presionar */
+    .btn {
+      transition: transform 160ms var(--ease-out), background-color 200ms ease, box-shadow 200ms ease, color 200ms ease, border-color 200ms ease;
+    }
+    .btn:active {
+      transform: scale(0.97);
+    }
+
+    /* Hover solo en dispositivos con puntero fino */
+    @media (hover: hover) and (pointer: fine) {
+      .nav-link::after {
+        content: '';
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: -4px;
+        height: 1px;
+        background: #E5989B;
+        transform: scaleX(0.4);
+        opacity: 0;
+        transform-origin: left;
+        transition: transform 200ms var(--ease-out), opacity 200ms ease;
+      }
+      .nav-link:hover::after {
+        transform: scaleX(1);
+        opacity: 1;
+      }
+      .btn-primary:hover { background-color: #D4787C; }
+      .btn-secondary:hover { border-color: #2B2B2B; background-color: rgba(255, 255, 255, 0.7); }
+      .hero-img:hover img { transform: scale(1.03); }
+    }
+
+    /* Navbar: sombra al hacer scroll */
+    #navbar {
+      transition: box-shadow 200ms ease, background-color 200ms ease;
+    }
+    #navbar.is-scrolled {
+      background-color: rgba(250, 247, 245, 0.82);
+      box-shadow: 0 8px 24px -16px rgba(43, 43, 43, 0.25);
+    }
+
+    /* Menú móvil: transición interrumpible (no keyframes) */
+    #mobile-menu {
+      opacity: 0;
+      transform: translateY(-8px) scale(0.98);
+      transform-origin: top right;
+      pointer-events: none;
+      transition: opacity 180ms ease-out, transform 220ms var(--ease-out);
+    }
+    #mobile-menu.is-open {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+      pointer-events: auto;
+    }
+
+    /* Icono hamburguesa → X */
+    .burger-line {
+      transition: transform 220ms var(--ease-out), opacity 150ms ease;
+      transform-origin: center;
+    }
+    [aria-expanded="true"] .burger-top { transform: translateY(6px) rotate(45deg); }
+    [aria-expanded="true"] .burger-mid { opacity: 0; }
+    [aria-expanded="true"] .burger-bot { transform: translateY(-6px) rotate(-45deg); }
+
+    /* Entrada escalonada del hero */
+    .reveal {
+      opacity: 0;
+      transform: translateY(12px);
+      animation: reveal 600ms var(--ease-out) forwards;
+    }
+    .reveal-1 { animation-delay: 60ms; }
+    .reveal-2 { animation-delay: 120ms; }
+    .reveal-3 { animation-delay: 180ms; }
+    .reveal-4 { animation-delay: 240ms; }
+    .reveal-img {
+      opacity: 0;
+      clip-path: inset(0 0 100% 0);
+      animation: revealImg 900ms cubic-bezier(0.77, 0, 0.175, 1) 150ms forwards;
+    }
+    .hero-img img {
+      transition: transform 600ms var(--ease-out);
+    }
+
+    @keyframes reveal {
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes revealImg {
+      to { opacity: 1; clip-path: inset(0 0 0 0); }
+    }
+
+    /* Galería */
+    .gallery-item img {
+      transition: transform 500ms var(--ease-out);
+    }
+    .gallery-item:active { transform: scale(0.98); }
+    .gallery-item { transition: transform 160ms var(--ease-out); }
+    .gallery-item:focus-visible { outline: 2px solid #E5989B; outline-offset: 3px; }
+    @media (hover: hover) and (pointer: fine) {
+      .gallery-label {
+        opacity: 0;
+        transform: translateY(6px);
+        transition: opacity 200ms ease, transform 200ms var(--ease-out);
+      }
+      .gallery-item:hover .gallery-label,
+      .gallery-item:focus-visible .gallery-label {
+        opacity: 1;
+        transform: translateY(0);
+      }
+      .gallery-item:hover img { transform: scale(1.04); }
+    }
+
+    /* Lightbox: transiciones interrumpibles; la salida es más rápida que la entrada */
+    #lightbox {
+      opacity: 0;
+      transition: opacity 150ms ease-out;
+    }
+    #lightbox.is-open {
+      opacity: 1;
+      transition-duration: 220ms;
+    }
+    .lightbox-figure {
+      transform: scale(0.96);
+      transition: transform 150ms ease-out;
+    }
+    #lightbox.is-open .lightbox-figure {
+      transform: scale(1);
+      transition: transform 280ms var(--ease-out);
+    }
+
+    /* Botón flotante de WhatsApp: entrada tardía + pulso suave y espaciado */
+    .wa-float {
+      opacity: 0;
+      transform: translateY(16px) scale(0.9);
+      animation: waIn 500ms var(--ease-out) 1200ms forwards;
+    }
+    .wa-float.is-ready {
+      transform: none;
+      transition: transform 160ms var(--ease-out);
+    }
+    .wa-float.is-ready:active { transform: scale(0.95); }
+    .wa-ring {
+      opacity: 0;
+      animation: waRing 4s ease-out 2500ms infinite;
+    }
+    @keyframes waIn {
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    @keyframes waRing {
+      0% { opacity: 0.45; transform: scale(1); }
+      40%, 100% { opacity: 0; transform: scale(1.6); }
+    }
+    @media (hover: hover) and (pointer: fine) {
+      .wa-float.is-ready:hover { transform: translateY(-2px); }
+      .social-link:hover { background-color: #E5989B; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .wa-float { transform: none; animation: fadeOnly 300ms ease 1200ms forwards; }
+      .wa-ring { display: none; }
+      .lightbox-figure, #lightbox.is-open .lightbox-figure { transform: none; }
+      .gallery-item img, .gallery-label { transition: opacity 200ms ease; transform: none !important; }
+      .reveal, .reveal-img {
+        transform: none;
+        clip-path: none;
+        animation: fadeOnly 300ms ease forwards;
+      }
+      #mobile-menu { transform: none; }
+      #mobile-menu.is-open { transform: none; }
+      .hero-img img { transition: none; }
+      @keyframes fadeOnly { to { opacity: 1; } }
+    }
+  </style>
+</head>
+
+<body class="bg-cream font-sans text-ink">
+
+  <!-- ===================== NAVBAR ===================== -->
+  <header id="navbar" class="sticky top-0 z-50 border-b border-white/60 bg-cream/60 backdrop-blur-xl backdrop-saturate-150">
+    <nav class="relative mx-auto flex h-16 max-w-7xl items-center justify-between px-5 md:h-20 md:px-8" aria-label="Navegación principal">
+
+      <!-- Logo -->
+      <a href="#inicio" class="flex items-center gap-2.5" aria-label="Nail Studio, ir al inicio">
+        <span class="flex h-9 w-9 items-center justify-center rounded-full bg-rose-soft">
+          <svg class="h-5 w-5 text-rose-dark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M9 3h6v4a3 3 0 0 1-6 0V3Z" />
+            <path d="M12 10v2" />
+            <rect x="7.5" y="12" width="9" height="9" rx="2.5" />
+          </svg>
+        </span>
+        <span class="font-serif text-xl font-semibold tracking-tight md:text-2xl">
+          Nail <span class="italic text-rose-dark">Studio</span>
+        </span>
+      </a>
+
+      <!-- Enlaces (desktop) -->
+      <ul class="absolute left-1/2 hidden -translate-x-1/2 items-center gap-10 text-[15px] font-medium text-ink/80 md:flex">
+        <li><a href="#servicios" class="nav-link relative transition-colors duration-200 hover:text-ink">Servicios</a></li>
+        <li><a href="#galeria" class="nav-link relative transition-colors duration-200 hover:text-ink">Galería</a></li>
+        <li><a href="#ubicacion" class="nav-link relative transition-colors duration-200 hover:text-ink">Ubicación</a></li>
+      </ul>
+
+      <!-- CTA (desktop) -->
+      <a href="https://wa.me/5215512345678?text=Hola%20Nail%20Studio%2C%20quiero%20reservar%20una%20cita"
+         target="_blank" rel="noopener"
+         class="btn btn-primary hidden items-center gap-2 rounded-full bg-rose px-5 py-2.5 text-sm font-semibold text-white shadow-rose md:inline-flex">
+        Reservar Cita
+        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </a>
+
+      <!-- Hamburguesa (móvil) -->
+      <button id="menu-toggle" type="button"
+              class="btn flex h-11 w-11 items-center justify-center rounded-full border border-ink/10 bg-white/60 md:hidden"
+              aria-controls="mobile-menu" aria-expanded="false" aria-label="Abrir menú">
+        <span class="flex h-[14px] w-5 flex-col justify-between">
+          <span class="burger-line burger-top block h-[2px] w-full rounded-full bg-ink"></span>
+          <span class="burger-line burger-mid block h-[2px] w-full rounded-full bg-ink"></span>
+          <span class="burger-line burger-bot block h-[2px] w-full rounded-full bg-ink"></span>
+        </span>
+      </button>
+
+      <!-- Menú móvil -->
+      <div id="mobile-menu"
+           class="absolute left-4 right-4 top-[calc(100%+8px)] rounded-3xl border border-white/70 bg-cream/90 p-3 shadow-soft backdrop-blur-xl md:hidden"
+           aria-hidden="true">
+        <ul class="flex flex-col text-base font-medium">
+          <li><a href="#servicios" class="mobile-link block rounded-2xl px-4 py-3.5 active:bg-rose-soft/60">Servicios</a></li>
+          <li><a href="#galeria" class="mobile-link block rounded-2xl px-4 py-3.5 active:bg-rose-soft/60">Galería</a></li>
+          <li><a href="#ubicacion" class="mobile-link block rounded-2xl px-4 py-3.5 active:bg-rose-soft/60">Ubicación</a></li>
+        </ul>
+        <a href="https://wa.me/5215512345678?text=Hola%20Nail%20Studio%2C%20quiero%20reservar%20una%20cita"
+           target="_blank" rel="noopener"
+           class="mobile-link btn btn-primary mt-2 flex items-center justify-center gap-2 rounded-2xl bg-rose px-5 py-3.5 font-semibold text-white shadow-rose">
+          Reservar Cita
+        </a>
+      </div>
+    </nav>
+  </header>
+
+  <main>
+    <!-- ===================== HERO ===================== -->
+    <section id="inicio" class="relative overflow-hidden">
+      <!-- Decoración de fondo -->
+      <div class="pointer-events-none absolute -right-32 -top-32 h-[28rem] w-[28rem] rounded-full bg-rose-soft/60 blur-3xl" aria-hidden="true"></div>
+      <div class="pointer-events-none absolute -bottom-40 -left-24 h-[24rem] w-[24rem] rounded-full bg-sand/20 blur-3xl" aria-hidden="true"></div>
+
+      <div class="relative mx-auto grid min-h-[calc(100svh-4rem)] max-w-7xl items-center gap-12 px-5 py-14 md:min-h-[calc(100svh-5rem)] md:grid-cols-2 md:gap-16 md:px-8 md:py-20">
+
+        <!-- Columna izquierda -->
+        <div class="order-2 md:order-1">
+          <p class="reveal reveal-1 mb-5 inline-flex items-center gap-2 rounded-full border border-rose/30 bg-white/60 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-rose-dark">
+            <span class="h-1.5 w-1.5 rounded-full bg-rose"></span>
+            Manicura · Pedicura · Nail Art
+          </p>
+
+          <h1 class="reveal reveal-2 font-serif text-[2.6rem] font-medium leading-[1.08] tracking-tight sm:text-5xl lg:text-[4.25rem]">
+            Uñas que hablan
+            <span class="italic text-rose-dark">por ti</span>,
+            con el cuidado que mereces.
+          </h1>
+
+          <p class="reveal reveal-3 mt-6 max-w-lg text-base leading-relaxed text-ink/70 sm:text-lg">
+            Diseños a medida, productos premium y técnicas que protegen tu uña natural.
+            Relájate en un espacio pensado para ti y sal con un acabado impecable que dura semanas.
+          </p>
+
+          <div class="reveal reveal-4 mt-9 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <a href="https://wa.me/5215512345678?text=Hola%20Nail%20Studio%2C%20quiero%20agendar%20una%20cita"
+               target="_blank" rel="noopener"
+               class="btn btn-primary inline-flex items-center justify-center gap-2.5 rounded-full bg-rose px-7 py-4 text-[15px] font-semibold text-white shadow-rose">
+              <svg class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38a9.87 9.87 0 0 0 4.74 1.21h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2Zm5.8 14.1c-.24.68-1.41 1.3-1.94 1.38-.5.07-1.13.1-1.82-.12-.42-.13-.96-.31-1.65-.61-2.9-1.25-4.8-4.18-4.94-4.37-.15-.2-1.18-1.57-1.18-3s.75-2.13 1.02-2.42c.27-.29.58-.37.78-.37h.56c.18 0 .42-.07.66.5.24.58.83 2.01.9 2.16.07.15.12.32.02.51-.1.2-.15.32-.29.49-.15.17-.31.38-.44.51-.15.15-.3.3-.13.6.17.29.76 1.26 1.64 2.04 1.13 1.01 2.08 1.32 2.38 1.47.29.15.47.12.64-.07.17-.2.73-.85.93-1.15.2-.29.39-.24.66-.15.27.1 1.7.8 2 .95.29.15.49.22.56.34.07.12.07.7-.17 1.38Z"/>
+              </svg>
+              Agendar por WhatsApp
+            </a>
+            <a href="#servicios"
+               class="btn btn-secondary inline-flex items-center justify-center gap-2 rounded-full border border-ink/20 bg-white/40 px-7 py-4 text-[15px] font-semibold text-ink">
+              Ver Precios
+            </a>
+          </div>
+
+          <dl class="reveal reveal-4 mt-12 flex gap-10 border-t border-ink/10 pt-8">
+            <div>
+              <dt class="text-xs uppercase tracking-[0.14em] text-ink/50">Clientas felices</dt>
+              <dd class="mt-1 font-serif text-3xl">+1,200</dd>
+            </div>
+            <div>
+              <dt class="text-xs uppercase tracking-[0.14em] text-ink/50">Valoración</dt>
+              <dd class="mt-1 font-serif text-3xl">4.9<span class="text-rose-dark">★</span></dd>
+            </div>
+          </dl>
+        </div>
+
+        <!-- Columna derecha -->
+        <div class="order-1 md:order-2">
+          <div class="relative mx-auto max-w-md md:max-w-none">
+            <div class="hero-img reveal-img relative aspect-[4/5] overflow-hidden rounded-[2.5rem] rounded-tr-[8rem] bg-nude shadow-soft">
+              <img src="https://images.unsplash.com/photo-1604654894610-df63bc536371?auto=format&fit=crop&w=1200&q=80"
+                   alt="Manos con manicura en tono nude y rosa sobre fondo suave"
+                   class="h-full w-full object-cover"
+                   width="1200" height="1500" fetchpriority="high" />
+            </div>
+
+            <!-- Tarjeta flotante -->
+            <div class="reveal reveal-4 absolute -bottom-6 -left-4 flex items-center gap-3 rounded-2xl border border-white/70 bg-white/75 px-4 py-3 shadow-soft backdrop-blur-md sm:-left-8">
+              <span class="flex h-10 w-10 items-center justify-center rounded-full bg-rose-soft text-rose-dark">
+                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.4 6.8 19.1l1-5.8L3.5 9.2l5.9-.9L12 3Z"/></svg>
+              </span>
+              <div>
+                <p class="text-sm font-semibold leading-tight">Esmaltado semipermanente</p>
+                <p class="text-xs text-ink/60">Hasta 3 semanas de brillo</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ===================== SERVICIOS ===================== -->
+    <section id="servicios" class="py-20 px-4 max-w-6xl mx-auto scroll-mt-20 md:scroll-mt-24">
+      <div class="mx-auto max-w-2xl text-center">
+        <p class="text-xs font-semibold uppercase tracking-[0.22em] text-sand">Servicios &amp; Precios</p>
+        <h2 class="mt-3 font-serif text-4xl font-medium tracking-tight sm:text-5xl">Menú de Tratamientos</h2>
+        <p class="mt-4 text-base leading-relaxed text-ink/70">
+          Elige tu ritual favorito. Todos nuestros servicios incluyen esterilización de herramientas, limpieza de cutícula e hidratación final.
+        </p>
+      </div>
+
+      <!-- Pestañas -->
+      <div class="mt-10 flex justify-center">
+        <div role="tablist" aria-label="Categorías de servicios"
+             class="grid w-full max-w-xl grid-cols-3 gap-1.5 rounded-full bg-white/70 p-1.5 shadow-soft sm:gap-2">
+          <button type="button" role="tab" id="tab-manicura" aria-controls="panel-manicura" aria-selected="true" tabindex="0"
+                  class="tab-btn btn rounded-full bg-ink px-2 py-3 text-[13px] font-semibold text-cream sm:px-5 sm:text-sm">
+            Manicura
+          </button>
+          <button type="button" role="tab" id="tab-pedicura" aria-controls="panel-pedicura" aria-selected="false" tabindex="-1"
+                  class="tab-btn btn rounded-full bg-rose-soft px-2 py-3 text-[13px] font-semibold text-ink sm:px-5 sm:text-sm">
+            Pedicura Spa
+          </button>
+          <button type="button" role="tab" id="tab-acrilicas" aria-controls="panel-acrilicas" aria-selected="false" tabindex="-1"
+                  class="tab-btn btn rounded-full bg-rose-soft px-2 py-3 text-[13px] font-semibold text-ink sm:px-5 sm:text-sm">
+            Acrílicas &amp; Gel
+          </button>
+        </div>
+      </div>
+
+      <!-- Panel: Manicura -->
+      <div id="panel-manicura" role="tabpanel" aria-labelledby="tab-manicura" tabindex="0" class="tab-panel mt-10 grid grid-cols-1 md:grid-cols-2 gap-6">
+        <article class="service-card flex flex-col rounded-3xl border border-white/80 bg-white/70 p-6 shadow-soft sm:p-7">
+          <div class="flex items-start justify-between gap-4">
+            <h3 class="font-serif text-2xl font-medium">Manicura Clásica</h3>
+            <span class="shrink-0 rounded-full bg-cream px-3 py-1 text-xs font-medium text-ink/60">40 min</span>
+          </div>
+          <p class="mt-2 text-sm text-ink/65">Limado, cutícula, exfoliación y esmalte tradicional de tu elección.</p>
+          <div class="mt-6 flex items-center justify-between gap-4 border-t border-ink/10 pt-5">
+            <p class="font-serif text-3xl font-semibold text-ink">$250 <span class="font-sans text-xs font-medium text-ink/50">MXN</span></p>
+            <a href="https://wa.me/5215512345678?text=Hola,%20quiero%20reservar:%20Manicura%20Cl%C3%A1sica" target="_blank" rel="noopener"
+               class="btn btn-primary rounded-full bg-rose px-5 py-2.5 text-sm font-semibold text-white">Agendar</a>
+          </div>
+        </article>
+
+        <article class="service-card flex flex-col rounded-3xl border border-white/80 bg-white/70 p-6 shadow-soft sm:p-7">
+          <div class="flex items-start justify-between gap-4">
+            <h3 class="font-serif text-2xl font-medium">Manicura Rusa</h3>
+            <span class="shrink-0 rounded-full bg-cream px-3 py-1 text-xs font-medium text-ink/60">75 min</span>
+          </div>
+          <p class="mt-2 text-sm text-ink/65">Limpieza profunda de cutícula con torno para un acabado ultra pulido.</p>
+          <div class="mt-6 flex items-center justify-between gap-4 border-t border-ink/10 pt-5">
+            <p class="font-serif text-3xl font-semibold text-ink">$420 <span class="font-sans text-xs font-medium text-ink/50">MXN</span></p>
+            <a href="https://wa.me/5215512345678?text=Hola,%20quiero%20reservar:%20Manicura%20Rusa" target="_blank" rel="noopener"
+               class="btn btn-primary rounded-full bg-rose px-5 py-2.5 text-sm font-semibold text-white">Agendar</a>
+          </div>
+        </article>
+
+        <article class="service-card flex flex-col rounded-3xl border border-white/80 bg-white/70 p-6 shadow-soft sm:p-7">
+          <div class="flex items-start justify-between gap-4">
+            <h3 class="font-serif text-2xl font-medium">Semipermanente</h3>
+            <span class="shrink-0 rounded-full bg-cream px-3 py-1 text-xs font-medium text-ink/60">60 min</span>
+          </div>
+          <p class="mt-2 text-sm text-ink/65">Esmalte en gel curado con lámpara LED, brillo intacto hasta 3 semanas.</p>
+          <div class="mt-6 flex items-center justify-between gap-4 border-t border-ink/10 pt-5">
+            <p class="font-serif text-3xl font-semibold text-ink">$380 <span class="font-sans text-xs font-medium text-ink/50">MXN</span></p>
+            <a href="https://wa.me/5215512345678?text=Hola,%20quiero%20reservar:%20Manicura%20Semipermanente" target="_blank" rel="noopener"
+               class="btn btn-primary rounded-full bg-rose px-5 py-2.5 text-sm font-semibold text-white">Agendar</a>
+          </div>
+        </article>
+
+        <article class="service-card flex flex-col rounded-3xl border border-white/80 bg-white/70 p-6 shadow-soft sm:p-7">
+          <div class="flex items-start justify-between gap-4">
+            <h3 class="font-serif text-2xl font-medium">Francesa Moderna</h3>
+            <span class="shrink-0 rounded-full bg-cream px-3 py-1 text-xs font-medium text-ink/60">70 min</span>
+          </div>
+          <p class="mt-2 text-sm text-ink/65">Línea fina en punta con semipermanente, en blanco o tonos de color.</p>
+          <div class="mt-6 flex items-center justify-between gap-4 border-t border-ink/10 pt-5">
+            <p class="font-serif text-3xl font-semibold text-ink">$450 <span class="font-sans text-xs font-medium text-ink/50">MXN</span></p>
+            <a href="https://wa.me/5215512345678?text=Hola,%20quiero%20reservar:%20Francesa%20Moderna" target="_blank" rel="noopener"
+               class="btn btn-primary rounded-full bg-rose px-5 py-2.5 text-sm font-semibold text-white">Agendar</a>
+          </div>
+        </article>
+      </div>
+
+      <!-- Panel: Pedicura Spa -->
+      <div id="panel-pedicura" role="tabpanel" aria-labelledby="tab-pedicura" tabindex="0" class="tab-panel hidden mt-10 grid grid-cols-1 md:grid-cols-2 gap-6">
+        <article class="service-card flex flex-col rounded-3xl border border-white/80 bg-white/70 p-6 shadow-soft sm:p-7">
+          <div class="flex items-start justify-between gap-4">
+            <h3 class="font-serif text-2xl font-medium">Pedicura Express</h3>
+            <span class="shrink-0 rounded-full bg-cream px-3 py-1 text-xs font-medium text-ink/60">45 min</span>
+          </div>
+          <p class="mt-2 text-sm text-ink/65">Corte, limado, cutícula y esmalte tradicional para pies impecables.</p>
+          <div class="mt-6 flex items-center justify-between gap-4 border-t border-ink/10 pt-5">
+            <p class="font-serif text-3xl font-semibold text-ink">$320 <span class="font-sans text-xs font-medium text-ink/50">MXN</span></p>
+            <a href="https://wa.me/5215512345678?text=Hola,%20quiero%20reservar:%20Pedicura%20Express" target="_blank" rel="noopener"
+               class="btn btn-primary rounded-full bg-rose px-5 py-2.5 text-sm font-semibold text-white">Agendar</a>
+          </div>
+        </article>
+
+        <article class="service-card flex flex-col rounded-3xl border border-white/80 bg-white/70 p-6 shadow-soft sm:p-7">
+          <div class="flex items-start justify-between gap-4">
+            <h3 class="font-serif text-2xl font-medium">Pedicura Spa</h3>
+            <span class="shrink-0 rounded-full bg-cream px-3 py-1 text-xs font-medium text-ink/60">75 min</span>
+          </div>
+          <p class="mt-2 text-sm text-ink/65">Baño de sales, exfoliación, retiro de callosidad y masaje relajante.</p>
+          <div class="mt-6 flex items-center justify-between gap-4 border-t border-ink/10 pt-5">
+            <p class="font-serif text-3xl font-semibold text-ink">$480 <span class="font-sans text-xs font-medium text-ink/50">MXN</span></p>
+            <a href="https://wa.me/5215512345678?text=Hola,%20quiero%20reservar:%20Pedicura%20Spa" target="_blank" rel="noopener"
+               class="btn btn-primary rounded-full bg-rose px-5 py-2.5 text-sm font-semibold text-white">Agendar</a>
+          </div>
+        </article>
+
+        <article class="service-card flex flex-col rounded-3xl border border-white/80 bg-white/70 p-6 shadow-soft sm:p-7">
+          <div class="flex items-start justify-between gap-4">
+            <h3 class="font-serif text-2xl font-medium">Pedicura de Parafina</h3>
+            <span class="shrink-0 rounded-full bg-cream px-3 py-1 text-xs font-medium text-ink/60">90 min</span>
+          </div>
+          <p class="mt-2 text-sm text-ink/65">Ritual spa completo con baño de parafina caliente para hidratación profunda.</p>
+          <div class="mt-6 flex items-center justify-between gap-4 border-t border-ink/10 pt-5">
+            <p class="font-serif text-3xl font-semibold text-ink">$580 <span class="font-sans text-xs font-medium text-ink/50">MXN</span></p>
+            <a href="https://wa.me/5215512345678?text=Hola,%20quiero%20reservar:%20Pedicura%20de%20Parafina" target="_blank" rel="noopener"
+               class="btn btn-primary rounded-full bg-rose px-5 py-2.5 text-sm font-semibold text-white">Agendar</a>
+          </div>
+        </article>
+
+        <article class="service-card flex flex-col rounded-3xl border border-white/80 bg-white/70 p-6 shadow-soft sm:p-7">
+          <div class="flex items-start justify-between gap-4">
+            <h3 class="font-serif text-2xl font-medium">Pedicura Semipermanente</h3>
+            <span class="shrink-0 rounded-full bg-cream px-3 py-1 text-xs font-medium text-ink/60">80 min</span>
+          </div>
+          <p class="mt-2 text-sm text-ink/65">Pedicura spa con esmalte en gel que dura hasta 4 semanas sin descascararse.</p>
+          <div class="mt-6 flex items-center justify-between gap-4 border-t border-ink/10 pt-5">
+            <p class="font-serif text-3xl font-semibold text-ink">$550 <span class="font-sans text-xs font-medium text-ink/50">MXN</span></p>
+            <a href="https://wa.me/5215512345678?text=Hola,%20quiero%20reservar:%20Pedicura%20Semipermanente" target="_blank" rel="noopener"
+               class="btn btn-primary rounded-full bg-rose px-5 py-2.5 text-sm font-semibold text-white">Agendar</a>
+          </div>
+        </article>
+      </div>
+
+      <!-- Panel: Acrílicas & Gel -->
+      <div id="panel-acrilicas" role="tabpanel" aria-labelledby="tab-acrilicas" tabindex="0" class="tab-panel hidden mt-10 grid grid-cols-1 md:grid-cols-2 gap-6">
+        <article class="service-card flex flex-col rounded-3xl border border-white/80 bg-white/70 p-6 shadow-soft sm:p-7">
+          <div class="flex items-start justify-between gap-4">
+            <h3 class="font-serif text-2xl font-medium">Uñas Acrílicas</h3>
+            <span class="shrink-0 rounded-full bg-cream px-3 py-1 text-xs font-medium text-ink/60">120 min</span>
+          </div>
+          <p class="mt-2 text-sm text-ink/65">Set completo con tip o escultura, forma y largo a tu elección.</p>
+          <div class="mt-6 flex items-center justify-between gap-4 border-t border-ink/10 pt-5">
+            <p class="font-serif text-3xl font-semibold text-ink">$650 <span class="font-sans text-xs font-medium text-ink/50">MXN</span></p>
+            <a href="https://wa.me/5215512345678?text=Hola,%20quiero%20reservar:%20U%C3%B1as%20Acr%C3%ADlicas" target="_blank" rel="noopener"
+               class="btn btn-primary rounded-full bg-rose px-5 py-2.5 text-sm font-semibold text-white">Agendar</a>
+          </div>
+        </article>
+
+        <article class="service-card flex flex-col rounded-3xl border border-white/80 bg-white/70 p-6 shadow-soft sm:p-7">
+          <div class="flex items-start justify-between gap-4">
+            <h3 class="font-serif text-2xl font-medium">Gel Builder (Rubber Base)</h3>
+            <span class="shrink-0 rounded-full bg-cream px-3 py-1 text-xs font-medium text-ink/60">90 min</span>
+          </div>
+          <p class="mt-2 text-sm text-ink/65">Nivelación sobre uña natural para fortalecerla con un acabado natural.</p>
+          <div class="mt-6 flex items-center justify-between gap-4 border-t border-ink/10 pt-5">
+            <p class="font-serif text-3xl font-semibold text-ink">$520 <span class="font-sans text-xs font-medium text-ink/50">MXN</span></p>
+            <a href="https://wa.me/5215512345678?text=Hola,%20quiero%20reservar:%20Gel%20Builder%20(Rubber%20Base)" target="_blank" rel="noopener"
+               class="btn btn-primary rounded-full bg-rose px-5 py-2.5 text-sm font-semibold text-white">Agendar</a>
+          </div>
+        </article>
+
+        <article class="service-card flex flex-col rounded-3xl border border-white/80 bg-white/70 p-6 shadow-soft sm:p-7">
+          <div class="flex items-start justify-between gap-4">
+            <h3 class="font-serif text-2xl font-medium">Soft Gel (Gel X)</h3>
+            <span class="shrink-0 rounded-full bg-cream px-3 py-1 text-xs font-medium text-ink/60">100 min</span>
+          </div>
+          <p class="mt-2 text-sm text-ink/65">Extensiones de tip completo en gel suave, ligeras y flexibles.</p>
+          <div class="mt-6 flex items-center justify-between gap-4 border-t border-ink/10 pt-5">
+            <p class="font-serif text-3xl font-semibold text-ink">$600 <span class="font-sans text-xs font-medium text-ink/50">MXN</span></p>
+            <a href="https://wa.me/5215512345678?text=Hola,%20quiero%20reservar:%20Soft%20Gel%20(Gel%20X)" target="_blank" rel="noopener"
+               class="btn btn-primary rounded-full bg-rose px-5 py-2.5 text-sm font-semibold text-white">Agendar</a>
+          </div>
+        </article>
+
+        <article class="service-card flex flex-col rounded-3xl border border-white/80 bg-white/70 p-6 shadow-soft sm:p-7">
+          <div class="flex items-start justify-between gap-4">
+            <h3 class="font-serif text-2xl font-medium">Retoque de Acrílico</h3>
+            <span class="shrink-0 rounded-full bg-cream px-3 py-1 text-xs font-medium text-ink/60">75 min</span>
+          </div>
+          <p class="mt-2 text-sm text-ink/65">Relleno del crecimiento, reforma y cambio de color a las 2–3 semanas.</p>
+          <div class="mt-6 flex items-center justify-between gap-4 border-t border-ink/10 pt-5">
+            <p class="font-serif text-3xl font-semibold text-ink">$420 <span class="font-sans text-xs font-medium text-ink/50">MXN</span></p>
+            <a href="https://wa.me/5215512345678?text=Hola,%20quiero%20reservar:%20Retoque%20de%20Acr%C3%ADlico" target="_blank" rel="noopener"
+               class="btn btn-primary rounded-full bg-rose px-5 py-2.5 text-sm font-semibold text-white">Agendar</a>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <!-- ===================== GALERÍA ===================== -->
+    <section id="galeria" class="py-20 px-4 max-w-6xl mx-auto scroll-mt-20 md:scroll-mt-24">
+      <div class="flex flex-col items-start justify-between gap-6 sm:flex-row sm:items-end">
+        <div>
+          <p class="text-xs font-semibold uppercase tracking-[0.22em] text-sand">Portafolio</p>
+          <h2 class="mt-3 font-serif text-4xl font-medium tracking-tight sm:text-5xl">Arte en cada detalle</h2>
+          <p class="mt-4 max-w-md text-base leading-relaxed text-ink/70">Una selección de diseños recientes hechos en nuestro estudio. Toca cualquier foto para verla en grande.</p>
+        </div>
+        <a href="https://www.instagram.com/" target="_blank" rel="noopener"
+           class="btn btn-secondary inline-flex shrink-0 items-center gap-2 rounded-full border border-ink/20 bg-white/40 px-5 py-3 text-sm font-semibold text-ink">
+          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="3" width="18" height="18" rx="5" />
+            <circle cx="12" cy="12" r="4" />
+            <circle cx="17.5" cy="6.5" r="0.8" fill="currentColor" stroke="none" />
+          </svg>
+          Ver más en Instagram
+        </a>
+      </div>
+
+      <div class="mt-10 grid grid-cols-2 md:grid-cols-3 gap-4">
+        <button type="button" class="gallery-item group relative aspect-square overflow-hidden rounded-2xl bg-nude text-left"
+                data-full="https://images.unsplash.com/photo-1604654894610-df63bc536371?auto=format&fit=crop&w=1600&q=85" data-title="Baby Boomer"
+                aria-label="Ver diseño Baby Boomer en grande">
+          <img src="https://images.unsplash.com/photo-1604654894610-df63bc536371?auto=format&fit=crop&w=700&q=75" alt="Manicura estilo Baby Boomer en degradado nude a blanco" loading="lazy" class="h-full w-full object-cover" />
+          <span class="gallery-label absolute bottom-3 left-3 rounded-full bg-cream/85 px-3 py-1 text-xs font-semibold text-ink backdrop-blur-sm">Baby Boomer</span>
+        </button>
+
+        <button type="button" class="gallery-item group relative aspect-square overflow-hidden rounded-2xl bg-nude text-left"
+                data-full="https://images.unsplash.com/photo-1610992015732-2449b76344bc?auto=format&fit=crop&w=1600&q=85" data-title="French Micro"
+                aria-label="Ver diseño French Micro en grande">
+          <img src="https://images.unsplash.com/photo-1610992015732-2449b76344bc?auto=format&fit=crop&w=700&q=75" alt="Manicura francesa con línea fina en la punta" loading="lazy" class="h-full w-full object-cover" />
+          <span class="gallery-label absolute bottom-3 left-3 rounded-full bg-cream/85 px-3 py-1 text-xs font-semibold text-ink backdrop-blur-sm">French Micro</span>
+        </button>
+
+        <button type="button" class="gallery-item group relative aspect-square overflow-hidden rounded-2xl bg-nude text-left"
+                data-full="https://images.unsplash.com/photo-1632345031435-8727f6897d53?auto=format&fit=crop&w=1600&q=85" data-title="Chrome Glaze"
+                aria-label="Ver diseño Chrome Glaze en grande">
+          <img src="https://images.unsplash.com/photo-1632345031435-8727f6897d53?auto=format&fit=crop&w=700&q=75" alt="Uñas con acabado cromado perlado" loading="lazy" class="h-full w-full object-cover" />
+          <span class="gallery-label absolute bottom-3 left-3 rounded-full bg-cream/85 px-3 py-1 text-xs font-semibold text-ink backdrop-blur-sm">Chrome Glaze</span>
+        </button>
+
+        <button type="button" class="gallery-item group relative aspect-square overflow-hidden rounded-2xl bg-nude text-left"
+                data-full="https://images.unsplash.com/photo-1519014816548-bf5fe059798b?auto=format&fit=crop&w=1600&q=85" data-title="Rosé Clásico"
+                aria-label="Ver diseño Rosé Clásico en grande">
+          <img src="https://images.unsplash.com/photo-1519014816548-bf5fe059798b?auto=format&fit=crop&w=700&q=75" alt="Esmaltado en tono rosa clásico" loading="lazy" class="h-full w-full object-cover" />
+          <span class="gallery-label absolute bottom-3 left-3 rounded-full bg-cream/85 px-3 py-1 text-xs font-semibold text-ink backdrop-blur-sm">Rosé Clásico</span>
+        </button>
+
+        <button type="button" class="gallery-item group relative aspect-square overflow-hidden rounded-2xl bg-nude text-left"
+                data-full="https://images.unsplash.com/photo-1607779097040-26e80aa78e66?auto=format&fit=crop&w=1600&q=85" data-title="Nude Almond"
+                aria-label="Ver diseño Nude Almond en grande">
+          <img src="https://images.unsplash.com/photo-1607779097040-26e80aa78e66?auto=format&fit=crop&w=700&q=75" alt="Uñas almendradas en tono nude" loading="lazy" class="h-full w-full object-cover" />
+          <span class="gallery-label absolute bottom-3 left-3 rounded-full bg-cream/85 px-3 py-1 text-xs font-semibold text-ink backdrop-blur-sm">Nude Almond</span>
+        </button>
+
+        <button type="button" class="gallery-item group relative aspect-square overflow-hidden rounded-2xl bg-nude text-left"
+                data-full="https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=1600&q=85" data-title="Bordeaux Gloss"
+                aria-label="Ver diseño Bordeaux Gloss en grande">
+          <img src="https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=700&q=75" alt="Manicura brillante en tono vino" loading="lazy" class="h-full w-full object-cover" />
+          <span class="gallery-label absolute bottom-3 left-3 rounded-full bg-cream/85 px-3 py-1 text-xs font-semibold text-ink backdrop-blur-sm">Bordeaux Gloss</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- Lightbox -->
+    <div id="lightbox" class="fixed inset-0 bg-ink/90 z-50 hidden items-center justify-center p-4 sm:p-8"
+         role="dialog" aria-modal="true" aria-labelledby="lightbox-title" aria-hidden="true">
+      <button id="lightbox-close" type="button" aria-label="Cerrar visor"
+              class="btn absolute right-4 top-4 flex h-11 w-11 items-center justify-center rounded-full bg-cream/10 text-cream ring-1 ring-cream/20 sm:right-6 sm:top-6">
+        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+      <figure id="lightbox-figure" class="lightbox-figure flex max-h-full w-full max-w-3xl flex-col items-center">
+        <img id="lightbox-img" src="" alt="" class="max-h-[78vh] w-auto rounded-2xl object-contain shadow-2xl" />
+        <figcaption id="lightbox-title" class="mt-4 font-serif text-2xl text-cream"></figcaption>
+      </figure>
+    </div>
+
+    <!-- ===================== UBICACIÓN ===================== -->
+    <section id="ubicacion" class="py-20 px-4 max-w-6xl mx-auto scroll-mt-20 md:scroll-mt-24">
+      <div class="grid grid-cols-1 items-center gap-10 rounded-3xl bg-rose-soft/30 p-8 md:grid-cols-2 md:gap-12 md:p-12">
+
+        <!-- Columna 1: datos -->
+        <div>
+          <p class="text-xs font-semibold uppercase tracking-[0.22em] text-sand">Ubicación &amp; Horarios</p>
+          <h2 class="mt-3 font-serif text-4xl font-medium tracking-tight sm:text-5xl">Visítanos</h2>
+          <p class="mt-4 max-w-md text-base leading-relaxed text-ink/70">Un espacio luminoso y tranquilo en el corazón de la Roma, pensado para que te desconectes mientras te consentimos.</p>
+
+          <dl class="mt-8 space-y-6">
+            <div class="flex gap-4">
+              <dt class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/80 text-rose-dark">
+                <span class="sr-only">Dirección</span>
+                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-5.6-7-11a7 7 0 0 1 14 0c0 5.4-7 11-7 11Z"/><circle cx="12" cy="10" r="2.5"/></svg>
+              </dt>
+              <dd>
+                <p class="font-semibold">Calle Orizaba 128, Local 3</p>
+                <p class="text-sm text-ink/65">Col. Roma Norte, Cuauhtémoc, 06700 CDMX</p>
+              </dd>
+            </div>
+            <div class="flex gap-4">
+              <dt class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/80 text-rose-dark">
+                <span class="sr-only">Horario</span>
+                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+              </dt>
+              <dd>
+                <p class="font-semibold">Lun – Sáb: 10:00 – 20:00</p>
+                <p class="text-sm text-ink/65">Domingo: cerrado · Citas con 24 h de anticipación</p>
+              </dd>
+            </div>
+            <div class="flex gap-4">
+              <dt class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/80 text-rose-dark">
+                <span class="sr-only">Teléfono</span>
+                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2Z"/></svg>
+              </dt>
+              <dd>
+                <p class="font-semibold">55 1234 5678</p>
+                <p class="text-sm text-ink/65">Llamadas y WhatsApp</p>
+              </dd>
+            </div>
+          </dl>
+
+          <div class="mt-9 flex flex-col gap-3 sm:flex-row">
+            <a href="https://www.google.com/maps/search/?api=1&query=Calle+Orizaba+128+Roma+Norte+CDMX" target="_blank" rel="noopener"
+               class="btn btn-secondary inline-flex items-center justify-center gap-2 rounded-full border border-ink/20 bg-white/60 px-6 py-3.5 text-sm font-semibold text-ink">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l18-8-8 18-2-8-8-2Z"/></svg>
+              Cómo llegar
+            </a>
+            <a href="https://wa.me/5215512345678?text=Hola%20Nail%20Studio%2C%20quiero%20agendar%20una%20cita" target="_blank" rel="noopener"
+               class="btn btn-primary inline-flex items-center justify-center gap-2 rounded-full bg-rose px-6 py-3.5 text-sm font-semibold text-white shadow-rose">
+              Agendar Cita
+            </a>
+          </div>
+        </div>
+
+        <!-- Columna 2: mapa -->
+        <div class="overflow-hidden rounded-3xl border border-white/80 bg-white/60 p-2 shadow-soft">
+          <iframe
+            title="Mapa de Nail Studio en Roma Norte, CDMX"
+            src="https://www.google.com/maps?q=Calle+Orizaba+128,+Roma+Norte,+CDMX&z=16&output=embed"
+            class="h-80 w-full rounded-2xl grayscale contrast-125 md:h-[26rem]"
+            style="border:0"
+            loading="lazy"
+            referrerpolicy="no-referrer-when-downgrade"
+            allowfullscreen></iframe>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ===================== FOOTER ===================== -->
+  <footer class="bg-ink text-cream py-10 px-4">
+    <div class="mx-auto flex max-w-6xl flex-col items-center gap-8 md:flex-row md:justify-between">
+      <a href="#inicio" class="flex items-center gap-2.5" aria-label="Nail Studio, volver al inicio">
+        <span class="flex h-9 w-9 items-center justify-center rounded-full bg-cream/10">
+          <svg class="h-5 w-5 text-rose" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M9 3h6v4a3 3 0 0 1-6 0V3Z" />
+            <path d="M12 10v2" />
+            <rect x="7.5" y="12" width="9" height="9" rx="2.5" />
+          </svg>
+        </span>
+        <span class="font-serif text-xl font-semibold tracking-tight">Nail <span class="italic text-rose">Studio</span></span>
+      </a>
+
+      <ul class="flex items-center gap-3" aria-label="Redes sociales">
+        <li>
+          <a href="https://www.instagram.com/" target="_blank" rel="noopener" aria-label="Instagram"
+             class="social-link btn flex h-11 w-11 items-center justify-center rounded-full bg-cream/10 text-cream">
+            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="0.8" fill="currentColor" stroke="none"/></svg>
+          </a>
+        </li>
+        <li>
+          <a href="https://www.tiktok.com/" target="_blank" rel="noopener" aria-label="TikTok"
+             class="social-link btn flex h-11 w-11 items-center justify-center rounded-full bg-cream/10 text-cream">
+            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.6 5.82A4.28 4.28 0 0 1 15.54 3h-3.09v12.4a2.59 2.59 0 0 1-2.59 2.5 2.59 2.59 0 0 1-2.59-2.59 2.59 2.59 0 0 1 3.38-2.47V9.68a5.7 5.7 0 0 0-.79-.05 5.68 5.68 0 0 0-5.68 5.68A5.68 5.68 0 0 0 9.86 21a5.68 5.68 0 0 0 5.68-5.68V9.01a7.35 7.35 0 0 0 4.3 1.38V7.3a4.3 4.3 0 0 1-3.24-1.48Z"/></svg>
+          </a>
+        </li>
+        <li>
+          <a href="https://wa.me/5215512345678" target="_blank" rel="noopener" aria-label="WhatsApp"
+             class="social-link btn flex h-11 w-11 items-center justify-center rounded-full bg-cream/10 text-cream">
+            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38a9.87 9.87 0 0 0 4.74 1.21h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2Zm5.8 14.1c-.24.68-1.41 1.3-1.94 1.38-.5.07-1.13.1-1.82-.12-.42-.13-.96-.31-1.65-.61-2.9-1.25-4.8-4.18-4.94-4.37-.15-.2-1.18-1.57-1.18-3s.75-2.13 1.02-2.42c.27-.29.58-.37.78-.37h.56c.18 0 .42-.07.66.5.24.58.83 2.01.9 2.16.07.15.12.32.02.51-.1.2-.15.32-.29.49-.15.17-.31.38-.44.51-.15.15-.3.3-.13.6.17.29.76 1.26 1.64 2.04 1.13 1.01 2.08 1.32 2.38 1.47.29.15.47.12.64-.07.17-.2.73-.85.93-1.15.2-.29.39-.24.66-.15.27.1 1.7.8 2 .95.29.15.49.22.56.34.07.12.07.7-.17 1.38Z"/></svg>
+          </a>
+        </li>
+      </ul>
+    </div>
+    <div class="mx-auto mt-8 max-w-6xl border-t border-cream/10 pt-6 text-center text-xs text-cream/50 md:text-left">
+      © <span id="year">2026</span> Nail Studio · Roma Norte, CDMX. Todos los derechos reservados.
+    </div>
+  </footer>
+
+  <!-- ===================== BOTÓN FLOTANTE WHATSAPP ===================== -->
+  <a id="wa-float" href="https://wa.me/5215512345678?text=Hola%20Nail%20Studio%2C%20quiero%20agendar%20una%20cita" target="_blank" rel="noopener"
+     aria-label="Agendar cita por WhatsApp"
+     class="wa-float btn fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-[#25D366] text-white shadow-[0_12px_28px_-8px_rgba(37,211,102,0.6)]">
+    <span class="wa-ring pointer-events-none absolute inset-0 rounded-full bg-[#25D366]" aria-hidden="true"></span>
+    <svg class="relative h-7 w-7" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38a9.87 9.87 0 0 0 4.74 1.21h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2Zm5.8 14.1c-.24.68-1.41 1.3-1.94 1.38-.5.07-1.13.1-1.82-.12-.42-.13-.96-.31-1.65-.61-2.9-1.25-4.8-4.18-4.94-4.37-.15-.2-1.18-1.57-1.18-3s.75-2.13 1.02-2.42c.27-.29.58-.37.78-.37h.56c.18 0 .42-.07.66.5.24.58.83 2.01.9 2.16.07.15.12.32.02.51-.1.2-.15.32-.29.49-.15.17-.31.38-.44.51-.15.15-.3.3-.13.6.17.29.76 1.26 1.64 2.04 1.13 1.01 2.08 1.32 2.38 1.47.29.15.47.12.64-.07.17-.2.73-.85.93-1.15.2-.29.39-.24.66-.15.27.1 1.7.8 2 .95.29.15.49.22.56.34.07.12.07.7-.17 1.38Z"/></svg>
+  </a>
+
+  <script>
+    (function () {
+      const navbar = document.getElementById('navbar');
+      const toggle = document.getElementById('menu-toggle');
+      const menu = document.getElementById('mobile-menu');
+      const links = menu.querySelectorAll('.mobile-link');
+
+      function setMenu(open) {
+        toggle.setAttribute('aria-expanded', String(open));
+        toggle.setAttribute('aria-label', open ? 'Cerrar menú' : 'Abrir menú');
+        menu.setAttribute('aria-hidden', String(!open));
+        menu.classList.toggle('is-open', open);
+      }
+
+      toggle.addEventListener('click', function (e) {
+        e.stopPropagation();
+        setMenu(toggle.getAttribute('aria-expanded') !== 'true');
+      });
+
+      links.forEach(function (link) {
+        link.addEventListener('click', function () { setMenu(false); });
+      });
+
+      document.addEventListener('click', function (e) {
+        if (!menu.contains(e.target) && !toggle.contains(e.target)) setMenu(false);
+      });
+
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && menu.classList.contains('is-open')) { setMenu(false); toggle.focus(); }
+      });
+
+      window.matchMedia('(min-width: 768px)').addEventListener('change', function (mq) {
+        if (mq.matches) setMenu(false);
+      });
+
+      function onScroll() {
+        navbar.classList.toggle('is-scrolled', window.scrollY > 8);
+      }
+      window.addEventListener('scroll', onScroll, { passive: true });
+      onScroll();
+
+      /* ---------- Pestañas de servicios ---------- */
+      const tabs = Array.from(document.querySelectorAll('[role="tab"]'));
+      const panels = Array.from(document.querySelectorAll('.tab-panel'));
+      const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+      function activateTab(tab, moveFocus) {
+        tabs.forEach(function (t) {
+          const active = t === tab;
+          t.setAttribute('aria-selected', String(active));
+          t.setAttribute('tabindex', active ? '0' : '-1');
+          t.classList.toggle('bg-ink', active);
+          t.classList.toggle('text-cream', active);
+          t.classList.toggle('bg-rose-soft', !active);
+          t.classList.toggle('text-ink', !active);
+        });
+
+        const targetId = tab.getAttribute('aria-controls');
+        panels.forEach(function (panel) {
+          const show = panel.id === targetId;
+          panel.classList.toggle('hidden', !show);
+          if (show && panel.animate) {
+            panel.animate(
+              reduceMotion.matches
+                ? [{ opacity: 0 }, { opacity: 1 }]
+                : [{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'translateY(0)' }],
+              { duration: 220, easing: 'cubic-bezier(0.23, 1, 0.32, 1)' }
+            );
+          }
+        });
+
+        if (moveFocus) tab.focus();
+      }
+
+      tabs.forEach(function (tab, i) {
+        tab.addEventListener('click', function () {
+          if (tab.getAttribute('aria-selected') !== 'true') activateTab(tab, false);
+        });
+        tab.addEventListener('keydown', function (e) {
+          let next = null;
+          if (e.key === 'ArrowRight') next = tabs[(i + 1) % tabs.length];
+          if (e.key === 'ArrowLeft') next = tabs[(i - 1 + tabs.length) % tabs.length];
+          if (e.key === 'Home') next = tabs[0];
+          if (e.key === 'End') next = tabs[tabs.length - 1];
+          if (next) { e.preventDefault(); activateTab(next, true); }
+        });
+      });
+
+      /* ---------- Año del footer ---------- */
+      document.getElementById('year').textContent = new Date().getFullYear();
+
+      /* Al terminar la entrada, soltar la animación para que :hover/:active controlen el transform */
+      const waFloat = document.getElementById('wa-float');
+      waFloat.addEventListener('animationend', function (e) {
+        if (e.target !== waFloat) return;
+        waFloat.style.opacity = '1';
+        waFloat.style.animation = 'none';
+        waFloat.style.transform = '';
+        waFloat.classList.add('is-ready');
+      });
+
+      /* ---------- Lightbox de galería ---------- */
+      const lightbox = document.getElementById('lightbox');
+      const lbImg = document.getElementById('lightbox-img');
+      const lbTitle = document.getElementById('lightbox-title');
+      const lbClose = document.getElementById('lightbox-close');
+      const lbFigure = document.getElementById('lightbox-figure');
+      let lastTrigger = null;
+      let closeTimer = null;
+
+      function openLightbox(item) {
+        clearTimeout(closeTimer);
+        lastTrigger = item;
+        const thumb = item.querySelector('img');
+        lbImg.src = item.dataset.full;
+        lbImg.alt = thumb ? thumb.alt : item.dataset.title;
+        lbTitle.textContent = item.dataset.title;
+
+        const scrollbar = window.innerWidth - document.documentElement.clientWidth;
+        document.body.style.overflow = 'hidden';
+        if (scrollbar > 0) document.body.style.paddingRight = scrollbar + 'px';
+
+        lightbox.classList.remove('hidden');
+        lightbox.classList.add('flex');
+        lightbox.setAttribute('aria-hidden', 'false');
+        void lightbox.offsetWidth; // forzar reflow para que la transición arranque
+        lightbox.classList.add('is-open');
+        lbClose.focus();
+      }
+
+      function closeLightbox() {
+        if (!lightbox.classList.contains('is-open')) return;
+        lightbox.classList.remove('is-open');
+        lightbox.setAttribute('aria-hidden', 'true');
+        document.body.style.overflow = '';
+        document.body.style.paddingRight = '';
+        closeTimer = setTimeout(function () {
+          lightbox.classList.add('hidden');
+          lightbox.classList.remove('flex');
+          lbImg.src = '';
+        }, 150);
+        if (lastTrigger) lastTrigger.focus();
+      }
+
+      document.querySelectorAll('.gallery-item').forEach(function (item) {
+        item.addEventListener('click', function () { openLightbox(item); });
+      });
+
+      lbClose.addEventListener('click', closeLightbox);
+
+      lightbox.addEventListener('click', function (e) {
+        if (e.target === lightbox || e.target === lbFigure) closeLightbox();
+      });
+
+      document.addEventListener('keydown', function (e) {
+        if (!lightbox.classList.contains('is-open')) return;
+        if (e.key === 'Escape') closeLightbox();
+        if (e.key === 'Tab') { e.preventDefault(); lbClose.focus(); }
+      });
+    })();
+  </script>
+</body>
+</html>
