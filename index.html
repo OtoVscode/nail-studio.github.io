@@ -2523,9 +2523,8 @@
       var copyTimeline = null;
       var scrubInitialized = false;
       var targetTime = 0;
-      var currentTime = 0;
       var rafId = null;
-      var lastSeekAt = 0;
+      var maxTime = 0;
 
       function updateChapters(progress) {
         var idx = clamp(Math.floor(progress * chapters.length), 0, chapters.length - 1);
@@ -2534,32 +2533,54 @@
         });
       }
 
-      /* Interpolación suave hacia el tiempo objetivo: evita saltos bruscos
-         y limita la frecuencia de "seek" para no saturar el decodificador. */
+      /* Motor de reproducción ligado al scroll:
+         - Hacia abajo: el video se REPRODUCE de forma nativa (movimiento fluido),
+           con una velocidad proporcional a la distancia que falta recorrer.
+           Scroll lento = cámara lenta; scroll rápido = avance rápido.
+         - Al dejar de hacer scroll: el video alcanza el punto y se pausa.
+         - Hacia arriba: retrocede suavemente con seeks escalonados. */
+      var MIN_RATE = 0.5;
+      var MAX_RATE = 4;
+      var TOLERANCE = 0.05;
+
+      function playSafely() {
+        var attempt = video.play();
+        if (attempt && typeof attempt.catch === "function") {
+          attempt.catch(function () {});
+        }
+      }
+
       function renderLoop() {
         rafId = null;
         if (!video.duration || isNaN(video.duration)) {
           return;
         }
 
-        var delta = targetTime - currentTime;
-        currentTime += delta * 0.18;
+        var diff = targetTime - video.currentTime;
 
-        if (Math.abs(delta) < 0.001) {
-          currentTime = targetTime;
-        }
-
-        var now = performance.now();
-        if (!video.seeking && now - lastSeekAt > 16) {
-          if (Math.abs(video.currentTime - currentTime) > 0.0005) {
-            video.currentTime = currentTime;
-            lastSeekAt = now;
+        if (diff > TOLERANCE) {
+          var rate = clamp(diff * 1.6, MIN_RATE, MAX_RATE);
+          if (Math.abs(video.playbackRate - rate) > 0.08) {
+            video.playbackRate = rate;
           }
+          if (video.paused) {
+            playSafely();
+          }
+        } else if (diff < -TOLERANCE) {
+          if (!video.paused) {
+            video.pause();
+          }
+          if (!video.seeking) {
+            video.currentTime = Math.max(video.currentTime + Math.min(diff * 0.3, -0.04), targetTime);
+          }
+        } else {
+          if (!video.paused) {
+            video.pause();
+          }
+          return;
         }
 
-        if (Math.abs(targetTime - currentTime) > 0.0005 || video.seeking) {
-          rafId = requestAnimationFrame(renderLoop);
-        }
+        rafId = requestAnimationFrame(renderLoop);
       }
 
       function requestRender() {
@@ -2568,29 +2589,43 @@
         }
       }
 
+      /* Carga el video completo en memoria (Blob) para que avanzar y retroceder
+         funcione igual en cualquier servidor, aunque no soporte peticiones por rangos. */
+      function bufferVideoAsBlob() {
+        if (!window.fetch || !window.URL || reduceMotionQuery.matches || video.src.indexOf("blob:") === 0) {
+          return;
+        }
+        fetch(video.currentSrc || video.getAttribute("src"))
+          .then(function (res) {
+            if (!res.ok) {
+              throw new Error("HTTP " + res.status);
+            }
+            return res.blob();
+          })
+          .then(function (blob) {
+            var resumeAt = video.currentTime;
+            video.addEventListener("loadedmetadata", function () {
+              video.currentTime = resumeAt;
+              requestRender();
+            }, { once: true });
+            video.src = URL.createObjectURL(blob);
+            video.load();
+          })
+          .catch(function () {});
+      }
+
       function initScrub() {
         if (scrubInitialized || !hasGSAP) {
           return;
         }
         scrubInitialized = true;
 
-        var duration = video.duration;
         /* Margen al final para no caer en el último frame negro de algunos códecs */
-        var maxTime = Math.max(duration - 0.05, 0);
+        maxTime = Math.max(video.duration - 0.05, 0);
 
         video.pause();
         video.currentTime = 0;
-        currentTime = 0;
         targetTime = 0;
-
-        /* Desbloqueo en iOS: un play/pause silencioso habilita el seek por frames */
-        var unlock = video.play();
-        if (unlock && typeof unlock.then === "function") {
-          unlock.then(function () {
-            video.pause();
-            video.currentTime = currentTime;
-          }).catch(function () {});
-        }
 
         scrubTrigger = ScrollTrigger.create({
           trigger: "#hero-scroll",
@@ -2677,6 +2712,7 @@
           cancelAnimationFrame(rafId);
           rafId = null;
         }
+        video.playbackRate = 1;
         scrubInitialized = false;
       }
 
@@ -2732,6 +2768,7 @@
         } else {
           initNativeScrub();
         }
+        bufferVideoAsBlob();
       }
 
       /* Control de carga: el cálculo del scrub se inicializa sólo tras loadedmetadata */
