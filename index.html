@@ -670,7 +670,7 @@
        ========================================================== */
     #hero-scroll {
       position: relative;
-      height: 300vh;
+      height: 550vh;
       background: #14120F;
     }
 
@@ -2539,8 +2539,8 @@
            Scroll lento = cámara lenta; scroll rápido = avance rápido.
          - Al dejar de hacer scroll: el video alcanza el punto y se pausa.
          - Hacia arriba: retrocede suavemente con seeks escalonados. */
-      var MIN_RATE = 0.5;
-      var MAX_RATE = 4;
+      var MIN_RATE = 0.35;
+      var MAX_RATE = 1.25;
       var TOLERANCE = 0.05;
 
       function playSafely() {
@@ -2559,7 +2559,7 @@
         var diff = targetTime - video.currentTime;
 
         if (diff > TOLERANCE) {
-          var rate = clamp(diff * 1.6, MIN_RATE, MAX_RATE);
+          var rate = clamp(diff * 0.7, MIN_RATE, MAX_RATE);
           if (Math.abs(video.playbackRate - rate) > 0.08) {
             video.playbackRate = rate;
           }
