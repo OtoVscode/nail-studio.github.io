@@ -35,6 +35,8 @@
   <meta name="twitter:image" content="https://otovscode.github.io/nail-studio.github.io/hero-poster.jpg" />
   <meta name="twitter:image:alt" content="Manos con manicura nude y detalles dorados en Maison Nails" />
 
+  <link rel="preload" as="image" href="frames/frame_0001.webp" type="image/webp" fetchpriority="high" />
+
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -666,31 +668,35 @@
     }
 
     /* ==========================================================
-       Hero con scroll scrubbing
+       Hero: secuencia de fotogramas en canvas atada al scroll
        ========================================================== */
     #hero-scroll {
       position: relative;
-      height: 550vh;
+      height: 400vh;
+      background: #14120F;
+      /* "clip" recorta sin crear un contenedor de scroll, así el sticky sigue funcionando */
+      overflow-x: clip;
+    }
+
+    #hero-canvas {
+      position: sticky;
+      top: 0;
+      display: block;
+      width: 100vw;
+      max-width: 100%;
+      height: 100vh;
       background: #14120F;
     }
 
+    /* La capa de contenido se superpone al canvas: también es sticky
+       y sube exactamente una pantalla para quedar encima de él. */
     .hero-sticky {
       position: sticky;
       top: 0;
+      z-index: 1;
       height: 100vh;
-      height: 100svh;
+      margin-top: -100vh;
       overflow: hidden;
-    }
-
-    #renderVideo {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      object-position: center 55%;
-      transform: scale(1.06);
-      will-change: transform;
     }
 
     .hero-scrim {
@@ -1823,8 +1829,9 @@
         height: 100svh;
       }
 
-      #renderVideo {
-        transform: none;
+      #hero-canvas,
+      .hero-sticky {
+        height: 100vh;
       }
 
       .reveal {
@@ -1886,20 +1893,9 @@
   <main id="main">
     <!-- ======================= HERO SCROLL ======================= -->
     <section id="hero-scroll" aria-label="Presentación de Maison Nails">
+      <canvas id="hero-canvas" role="img" aria-label="Secuencia de manicura de lujo: diseños nude, cromo, ónix y nail art de autor"></canvas>
+
       <div class="hero-sticky">
-        <video
-          id="renderVideo"
-          src="video-placeholder.mp4"
-          poster="hero-poster.jpg"
-          playsinline
-          webkit-playsinline
-          muted
-          preload="auto"
-          disablepictureinpicture
-          disableremoteplayback
-          aria-hidden="true"
-          tabindex="-1"
-        ></video>
         <div class="hero-scrim" aria-hidden="true"></div>
 
         <div class="container hero-content">
@@ -2506,9 +2502,19 @@
       }
 
       /* ----------------------------------------------------------
-         Motor de scroll scrubbing del video
+         Motor de secuencia de fotogramas en canvas
          ---------------------------------------------------------- */
-      var video = document.getElementById("renderVideo");
+      var FRAME_COUNT = 150;
+      var FRAME_DIR = "frames/";
+      var ZOOM_START = 1.06;
+      var FOCAL_Y = 0.55;
+
+      function framePath(index) {
+        return FRAME_DIR + "frame_" + String(index + 1).padStart(4, "0") + ".webp";
+      }
+
+      var canvas = document.getElementById("hero-canvas");
+      var ctx = canvas.getContext("2d", { alpha: false });
       var progressBar = document.getElementById("heroProgress");
       var chapters = document.querySelectorAll("#heroChapters li");
       var scrollIndicator = document.getElementById("scrollIndicator");
@@ -2519,12 +2525,146 @@
         document.getElementById("heroActions")
       ];
 
-      var scrubTrigger = null;
-      var copyTimeline = null;
-      var scrubInitialized = false;
-      var targetTime = 0;
+      var images = new Array(FRAME_COUNT);
+      var loaded = new Array(FRAME_COUNT);
+      var sequence = { frame: 0 };
+      var heroProgress = 0;
       var rafId = null;
-      var maxTime = 0;
+      var lastDrawn = { frame: -1, width: 0, height: 0, zoom: 0 };
+      var frameTween = null;
+      var copyTimeline = null;
+      var introTween = null;
+      var nativeScrollHandler = null;
+
+      function isLoaded(index) {
+        return loaded[index] === true;
+      }
+
+      /* Si el fotograma pedido aún no ha llegado, usa el cargado más cercano:
+         nunca se dibuja un hueco negro ni un fotograma a medias. */
+      function nearestLoadedFrame(index) {
+        if (isLoaded(index)) {
+          return index;
+        }
+        for (var offset = 1; offset < FRAME_COUNT; offset++) {
+          var before = index - offset;
+          var after = index + offset;
+          if (before >= 0 && isLoaded(before)) {
+            return before;
+          }
+          if (after < FRAME_COUNT && isLoaded(after)) {
+            return after;
+          }
+        }
+        return -1;
+      }
+
+      function currentZoom() {
+        if (reduceMotionQuery.matches) {
+          return 1;
+        }
+        return ZOOM_START - (ZOOM_START - 1) * heroProgress;
+      }
+
+      /* Ajusta el búfer del canvas a su tamaño en pantalla × densidad de píxeles
+         (máx. 2x) para que se vea nítido sin desperdiciar memoria. */
+      function resizeCanvas() {
+        var dpr = Math.min(window.devicePixelRatio || 1, 2);
+        var rect = canvas.getBoundingClientRect();
+        var width = Math.max(1, Math.round(rect.width * dpr));
+        var height = Math.max(1, Math.round(rect.height * dpr));
+
+        if (canvas.width !== width || canvas.height !== height) {
+          canvas.width = width;
+          canvas.height = height;
+          /* Cambiar el tamaño reinicia el contexto: restaurar la calidad de suavizado */
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = "high";
+          lastDrawn.frame = -1;
+        }
+      }
+
+      /* Dibuja el fotograma activo con el mismo comportamiento que object-fit: cover:
+         escala uniforme (misma proporción en ambos ejes), cubre todo el canvas
+         y centra el recorte. Nunca se estira ni se deforma. */
+      function render() {
+        rafId = null;
+
+        var target = clamp(Math.round(sequence.frame), 0, FRAME_COUNT - 1);
+        var index = nearestLoadedFrame(target);
+        if (index === -1) {
+          return;
+        }
+
+        var zoom = currentZoom();
+        var cw = canvas.width;
+        var ch = canvas.height;
+
+        if (
+          index === lastDrawn.frame &&
+          cw === lastDrawn.width &&
+          ch === lastDrawn.height &&
+          Math.abs(zoom - lastDrawn.zoom) < 0.0005
+        ) {
+          return;
+        }
+
+        var img = images[index];
+        var iw = img.naturalWidth;
+        var ih = img.naturalHeight;
+        var scale = Math.max(cw / iw, ch / ih) * zoom;
+        var dw = iw * scale;
+        var dh = ih * scale;
+        var dx = (cw - dw) / 2;
+        var dy = clamp((ch - dh) * FOCAL_Y, ch - dh, 0);
+
+        ctx.drawImage(img, 0, 0, iw, ih, dx, dy, dw, dh);
+
+        lastDrawn.frame = index;
+        lastDrawn.width = cw;
+        lastDrawn.height = ch;
+        lastDrawn.zoom = zoom;
+      }
+
+      function scheduleRender() {
+        if (rafId === null) {
+          rafId = requestAnimationFrame(render);
+        }
+      }
+
+      /* Precarga: el primer fotograma tiene prioridad y se dibuja en cuanto llega;
+         el resto se carga en orden y redibuja si es el que el scroll está pidiendo. */
+      function preloadFrames() {
+        for (var i = 0; i < FRAME_COUNT; i++) {
+          (function (index) {
+            var img = new Image();
+            img.decoding = "async";
+            if (index === 0) {
+              img.fetchPriority = "high";
+            }
+            img.onload = function () {
+              var finish = function () {
+                loaded[index] = true;
+                var wanted = clamp(Math.round(sequence.frame), 0, FRAME_COUNT - 1);
+                if (index === 0 || index === wanted || Math.abs(index - wanted) < Math.abs(lastDrawn.frame - wanted)) {
+                  scheduleRender();
+                }
+              };
+              /* decode() evita el tirón de decodificar la imagen justo al dibujarla */
+              if (typeof img.decode === "function") {
+                img.decode().then(finish, finish);
+              } else {
+                finish();
+              }
+            };
+            img.onerror = function () {
+              loaded[index] = false;
+            };
+            img.src = framePath(index);
+            images[index] = img;
+          })(i);
+        }
+      }
 
       function updateChapters(progress) {
         var idx = clamp(Math.floor(progress * chapters.length), 0, chapters.length - 1);
@@ -2533,125 +2673,32 @@
         });
       }
 
-      /* Motor de reproducción ligado al scroll:
-         - Hacia abajo: el video se REPRODUCE de forma nativa (movimiento fluido),
-           con una velocidad proporcional a la distancia que falta recorrer.
-           Scroll lento = cámara lenta; scroll rápido = avance rápido.
-         - Al dejar de hacer scroll: el video alcanza el punto y se pausa.
-         - Hacia arriba: retrocede suavemente con seeks escalonados. */
-      var MIN_RATE = 0.35;
-      var MAX_RATE = 1.25;
-      var TOLERANCE = 0.05;
-
-      function playSafely() {
-        var attempt = video.play();
-        if (attempt && typeof attempt.catch === "function") {
-          attempt.catch(function () {});
-        }
+      function updateHeroUI(progress) {
+        heroProgress = progress;
+        progressBar.style.transform = "scaleX(" + progress.toFixed(4) + ")";
+        updateChapters(progress);
+        scrollIndicator.style.opacity = progress > 0.04 ? "0" : "1";
       }
 
-      function renderLoop() {
-        rafId = null;
-        if (!video.duration || isNaN(video.duration)) {
-          return;
-        }
-
-        var diff = targetTime - video.currentTime;
-
-        if (diff > TOLERANCE) {
-          var rate = clamp(diff * 0.7, MIN_RATE, MAX_RATE);
-          if (Math.abs(video.playbackRate - rate) > 0.08) {
-            video.playbackRate = rate;
-          }
-          if (video.paused) {
-            playSafely();
-          }
-        } else if (diff < -TOLERANCE) {
-          if (!video.paused) {
-            video.pause();
-          }
-          if (!video.seeking) {
-            video.currentTime = Math.max(video.currentTime + Math.min(diff * 0.3, -0.04), targetTime);
-          }
-        } else {
-          if (!video.paused) {
-            video.pause();
-          }
-          return;
-        }
-
-        rafId = requestAnimationFrame(renderLoop);
-      }
-
-      function requestRender() {
-        if (rafId === null) {
-          rafId = requestAnimationFrame(renderLoop);
-        }
-      }
-
-      /* Carga el video completo en memoria (Blob) para que avanzar y retroceder
-         funcione igual en cualquier servidor, aunque no soporte peticiones por rangos. */
-      function bufferVideoAsBlob() {
-        if (!window.fetch || !window.URL || reduceMotionQuery.matches || video.src.indexOf("blob:") === 0) {
-          return;
-        }
-        fetch(video.currentSrc || video.getAttribute("src"))
-          .then(function (res) {
-            if (!res.ok) {
-              throw new Error("HTTP " + res.status);
-            }
-            return res.blob();
-          })
-          .then(function (blob) {
-            var resumeAt = video.currentTime;
-            video.addEventListener("loadedmetadata", function () {
-              video.currentTime = resumeAt;
-              requestRender();
-            }, { once: true });
-            video.src = URL.createObjectURL(blob);
-            video.load();
-          })
-          .catch(function () {});
-      }
-
-      function initScrub() {
-        if (scrubInitialized || !hasGSAP) {
-          return;
-        }
-        scrubInitialized = true;
-
-        /* Margen al final para no caer en el último frame negro de algunos códecs */
-        maxTime = Math.max(video.duration - 0.05, 0);
-
-        video.pause();
-        video.currentTime = 0;
-        targetTime = 0;
-
-        scrubTrigger = ScrollTrigger.create({
-          trigger: "#hero-scroll",
-          start: "top top",
-          end: "bottom bottom",
-          scrub: true,
-          invalidateOnRefresh: true,
-          onUpdate: function (self) {
-            targetTime = self.progress * maxTime;
-            requestRender();
-            progressBar.style.transform = "scaleX(" + self.progress.toFixed(4) + ")";
-            updateChapters(self.progress);
-            scrollIndicator.style.opacity = self.progress > 0.04 ? "0" : "1";
-          }
-        });
-
-        /* Zoom sutil del video y desvanecimiento progresivo del copy */
-        gsap.fromTo(video, { scale: 1.06 }, {
-          scale: 1,
+      /* Scroll → fotograma con GSAP: scrub 0.5 da inercia suave al frenar,
+         y snap a entero garantiza que siempre se pinta un fotograma completo. */
+      function initScrollSequence() {
+        frameTween = gsap.to(sequence, {
+          frame: FRAME_COUNT - 1,
+          snap: "frame",
           ease: "none",
           scrollTrigger: {
             trigger: "#hero-scroll",
             start: "top top",
             end: "bottom bottom",
-            scrub: 0.6
-          }
+            scrub: 0.5,
+            invalidateOnRefresh: true,
+            onUpdate: function (self) {
+              updateHeroUI(self.progress);
+              scheduleRender();
+            }
+          },
+          onUpdate: scheduleRender
         });
 
         copyTimeline = gsap.timeline({
@@ -2674,8 +2721,7 @@
           })
           .to({}, { duration: 0.2 });
 
-        /* Entrada inicial del copy */
-        gsap.from(heroCopy, {
+        introTween = gsap.from(heroCopy, {
           y: 30,
           autoAlpha: 0,
           duration: 1.1,
@@ -2687,10 +2733,27 @@
         ScrollTrigger.refresh();
       }
 
-      function teardownScrub() {
-        if (scrubTrigger) {
-          scrubTrigger.kill();
-          scrubTrigger = null;
+      /* Respaldo si el CDN de GSAP no carga: mismo mapeo scroll → fotograma */
+      function initNativeSequence() {
+        nativeScrollHandler = function () {
+          var rect = heroSection.getBoundingClientRect();
+          var total = heroSection.offsetHeight - window.innerHeight;
+          var progress = total > 0 ? clamp(-rect.top / total, 0, 1) : 0;
+          sequence.frame = progress * (FRAME_COUNT - 1);
+          updateHeroUI(progress);
+          scheduleRender();
+        };
+        window.addEventListener("scroll", nativeScrollHandler, { passive: true });
+        nativeScrollHandler();
+      }
+
+      function teardownSequence() {
+        if (frameTween) {
+          if (frameTween.scrollTrigger) {
+            frameTween.scrollTrigger.kill();
+          }
+          frameTween.kill();
+          frameTween = null;
         }
         if (copyTimeline) {
           if (copyTimeline.scrollTrigger) {
@@ -2699,127 +2762,73 @@
           copyTimeline.kill();
           copyTimeline = null;
         }
+        if (introTween) {
+          introTween.kill();
+          introTween = null;
+        }
         if (hasGSAP) {
-          ScrollTrigger.getAll().forEach(function (st) {
-            if (st.trigger === heroSection) {
-              st.kill();
-            }
-          });
           gsap.set(heroCopy, { clearProps: "all" });
-          gsap.set(video, { clearProps: "transform" });
         }
-        if (rafId !== null) {
-          cancelAnimationFrame(rafId);
-          rafId = null;
+        if (nativeScrollHandler) {
+          window.removeEventListener("scroll", nativeScrollHandler);
+          nativeScrollHandler = null;
         }
-        video.playbackRate = 1;
-        scrubInitialized = false;
       }
 
-      /* Fallback de movimiento reducido: sin scrub; el video se reproduce
-         en bucle lento o queda pausado en el primer frame si así lo prefiere el sistema. */
+      /* Movimiento reducido: sin scrub, el hero muestra un fotograma fijo */
       function initReducedMotion() {
-        teardownScrub();
-        video.loop = true;
-        video.playbackRate = 0.5;
+        teardownSequence();
+        sequence.frame = 0;
+        updateHeroUI(0);
         progressBar.style.transform = "scaleX(0)";
         scrollIndicator.style.opacity = "0";
-
-        var attempt = video.play();
-        if (attempt && typeof attempt.then === "function") {
-          attempt.catch(function () {
-            video.pause();
-            video.currentTime = 0;
-          });
-        }
+        lastDrawn.frame = -1;
+        scheduleRender();
       }
 
-      /* Fallback sin GSAP (CDN bloqueado): scrub nativo con scroll */
-      function initNativeScrub() {
-        var maxTime = Math.max(video.duration - 0.05, 0);
-        video.pause();
-
-        function onNativeScroll() {
-          var rect = heroSection.getBoundingClientRect();
-          var total = heroSection.offsetHeight - window.innerHeight;
-          var progress = clamp(-rect.top / total, 0, 1);
-          targetTime = progress * maxTime;
-          requestRender();
-          progressBar.style.transform = "scaleX(" + progress.toFixed(4) + ")";
-          updateChapters(progress);
-          scrollIndicator.style.opacity = progress > 0.04 ? "0" : "1";
-        }
-
-        window.addEventListener("scroll", onNativeScroll, { passive: true });
-        onNativeScroll();
-      }
-
-      function startExperience() {
+      function startSequence() {
+        teardownSequence();
         if (reduceMotionQuery.matches) {
           initReducedMotion();
           return;
         }
-
-        video.loop = false;
-        video.playbackRate = 1;
-
         if (hasGSAP) {
-          initScrub();
+          initScrollSequence();
         } else {
-          initNativeScrub();
+          initNativeSequence();
         }
-        bufferVideoAsBlob();
+        lastDrawn.frame = -1;
+        scheduleRender();
       }
 
-      /* Control de carga: el cálculo del scrub se inicializa sólo tras loadedmetadata */
-      if (video.readyState >= 1 && video.duration) {
-        startExperience();
-      } else {
-        video.addEventListener("loadedmetadata", startExperience, { once: true });
-      }
-
-      video.addEventListener("error", function () {
-        /* Si el video no carga, el póster mantiene el hero visualmente completo */
-        teardownScrub();
-        scrollIndicator.style.opacity = "1";
-      });
-
-      /* Reacciona en vivo si el usuario cambia la preferencia de movimiento */
-      function onMotionPreferenceChange() {
-        if (!video.duration) {
+      /* Redimensionado: recalcula el búfer y redibuja el fotograma activo
+         en el mismo frame de pintura, sin parpadeos. */
+      var resizeRaf = null;
+      function onResize() {
+        if (resizeRaf !== null) {
           return;
         }
-        if (reduceMotionQuery.matches) {
-          initReducedMotion();
-        } else {
-          video.pause();
-          startExperience();
-        }
+        resizeRaf = requestAnimationFrame(function () {
+          resizeRaf = null;
+          resizeCanvas();
+          if (rafId !== null) {
+            cancelAnimationFrame(rafId);
+          }
+          render();
+        });
       }
+
+      window.addEventListener("resize", onResize);
+      window.addEventListener("orientationchange", onResize);
+
+      resizeCanvas();
+      preloadFrames();
+      startSequence();
 
       if (typeof reduceMotionQuery.addEventListener === "function") {
-        reduceMotionQuery.addEventListener("change", onMotionPreferenceChange);
+        reduceMotionQuery.addEventListener("change", startSequence);
       } else if (typeof reduceMotionQuery.addListener === "function") {
-        reduceMotionQuery.addListener(onMotionPreferenceChange);
-      }
-
-      /* Pausa el loop de reduced-motion cuando el hero no está a la vista */
-      if ("IntersectionObserver" in window) {
-        new IntersectionObserver(function (entries) {
-          entries.forEach(function (entry) {
-            if (!reduceMotionQuery.matches) {
-              return;
-            }
-            if (entry.isIntersecting) {
-              var p = video.play();
-              if (p && typeof p.catch === "function") {
-                p.catch(function () {});
-              }
-            } else {
-              video.pause();
-            }
-          });
-        }, { threshold: 0.1 }).observe(heroSection);
+        reduceMotionQuery.addListener(startSequence);
       }
 
       /* ----------------------------------------------------------
