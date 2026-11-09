@@ -2557,7 +2557,7 @@
       var images = [];
       var loaded = [];
       var lastImage = null;
-      var lastDrawn = { image: null, width: 0, height: 0, zoom: 0 };
+      var lastDrawn = { image: null, next: null, blend: 0, width: 0, height: 0, zoom: 0 };
       var rafId = null;
 
       var frameTween = null;
@@ -2672,35 +2672,64 @@
       /* ---------- render(): escalado tipo object-fit: cover ----------
          Un único factor de escala en ambos ejes (sin deformación) que cubre
          todo el canvas, con recorte centrado. */
-      function render() {
-        rafId = null;
-
-        var index = clamp(Math.round(sequence.frame), 0, FRAME_COUNT - 1);
-        var img = nearestLoaded(index) || lastImage;
-        if (!img) {
-          return;
-        }
-
-        var zoom = currentZoom();
+      function drawCover(img, alpha) {
         var cw = canvas.width;
         var ch = canvas.height;
-
-        if (img === lastDrawn.image && cw === lastDrawn.width && ch === lastDrawn.height && Math.abs(zoom - lastDrawn.zoom) < 0.0005) {
-          return;
-        }
-
         var iw = img.naturalWidth;
         var ih = img.naturalHeight;
-        var scale = Math.max(cw / iw, ch / ih) * zoom;
+        var scale = Math.max(cw / iw, ch / ih) * currentZoom();
         var dw = iw * scale;
         var dh = ih * scale;
         var dx = (cw - dw) / 2;
         var dy = clamp((ch - dh) * FOCAL_Y, ch - dh, 0);
-
+        ctx.globalAlpha = alpha;
         ctx.drawImage(img, 0, 0, iw, ih, dx, dy, dw, dh);
+        ctx.globalAlpha = 1;
+      }
 
-        lastImage = img;
-        lastDrawn.image = img;
+      /* ---------- render(): movimiento continuo entre fotogramas ----------
+         La posición del scroll cae casi siempre "entre" dos fotogramas: se pinta
+         el anterior y encima el siguiente con una opacidad igual a lo que falta
+         recorrer. El resultado es una transición continua, sin saltos de cuadro. */
+      function render() {
+        rafId = null;
+
+        var position = clamp(sequence.frame, 0, FRAME_COUNT - 1);
+        var baseIndex = Math.floor(position);
+        var blend = position - baseIndex;
+        var nextIndex = Math.min(baseIndex + 1, FRAME_COUNT - 1);
+
+        var base = nearestLoaded(baseIndex) || lastImage;
+        if (!base) {
+          return;
+        }
+        var next = blend > 0.002 && loaded[nextIndex] ? images[nextIndex] : null;
+
+        var zoom = currentZoom();
+        var cw = canvas.width;
+        var ch = canvas.height;
+        var drawnBlend = next ? Math.round(blend * 64) / 64 : 0;
+
+        if (
+          base === lastDrawn.image &&
+          next === lastDrawn.next &&
+          drawnBlend === lastDrawn.blend &&
+          cw === lastDrawn.width &&
+          ch === lastDrawn.height &&
+          Math.abs(zoom - lastDrawn.zoom) < 0.0005
+        ) {
+          return;
+        }
+
+        drawCover(base, 1);
+        if (next) {
+          drawCover(next, drawnBlend);
+        }
+
+        lastImage = base;
+        lastDrawn.image = base;
+        lastDrawn.next = next;
+        lastDrawn.blend = drawnBlend;
         lastDrawn.width = cw;
         lastDrawn.height = ch;
         lastDrawn.zoom = zoom;
@@ -2808,9 +2837,10 @@
         });
       }
 
-      /* ---------- Scroll → fotograma ----------
-         scrub: 0.5 da una inercia corta y suave al frenar sin que la imagen
-         vaya por detrás del dedo; snap a entero pinta siempre un cuadro completo. */
+      /* ---------- Scroll → posición en la secuencia ----------
+         Valor continuo (sin redondear) para poder fundir fotogramas vecinos.
+         scrub: 1.4 = al soltar el scroll la imagen sigue deslizándose y se
+         detiene con una desaceleración suave, como un video que frena. */
       function setupFrameControl() {
         killAnimation(frameTween);
         frameTween = null;
@@ -2829,14 +2859,13 @@
           sequence.frame = scrollProgress() * (FRAME_COUNT - 1);
           frameTween = gsap.fromTo(sequence, { frame: 0 }, {
             frame: FRAME_COUNT - 1,
-            snap: "frame",
             ease: "none",
             immediateRender: false,
             scrollTrigger: {
               trigger: "#scroll-container",
               start: "top top",
               end: "bottom bottom",
-              scrub: 0.5,
+              scrub: 1.4,
               invalidateOnRefresh: true
             },
             onUpdate: scheduleRender
