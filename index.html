@@ -2555,6 +2555,7 @@
       var loopId = null;
       var heroVisible = true;
       var videoReady = false;
+      var hasDrawnVideo = false;
       var moduleInitialized = false;
       var timeTween = null;
       var copyTimeline = null;
@@ -2602,7 +2603,12 @@
       function drawFrame() {
         if (videoReady && video.readyState >= 2 && video.videoWidth) {
           drawCover(video, video.videoWidth, video.videoHeight);
+          hasDrawnVideo = true;
           return true;
+        }
+        /* Si ya se pintó video, se conserva el último cuadro en lugar de volver al póster */
+        if (hasDrawnVideo) {
+          return false;
         }
         if (poster.complete && poster.naturalWidth) {
           drawCover(poster, poster.naturalWidth, poster.naturalHeight);
@@ -2792,13 +2798,48 @@
         }
         moduleInitialized = true;
         videoReady = true;
-        video.pause();
         resizeCanvas();
         watchDecodedFrames();
         applyMotionMode();
         startLoop();
-        bufferVideoAsBlob();
+        primeDecoder();
+        if (!isFullySeekable()) {
+          bufferVideoAsBlob();
+        }
       }
+
+      /* ¿El servidor permite saltar a cualquier instante? (soporta peticiones por rangos) */
+      function isFullySeekable() {
+        try {
+          return video.seekable.length > 0 && video.seekable.end(video.seekable.length - 1) >= video.duration - 0.25;
+        } catch (e) {
+          return false;
+        }
+      }
+
+      /* iOS/Safari no decodifica cuadros de un video que nunca se reprodujo:
+         un play() silencioso seguido de pause() fuerza la carga del primer cuadro. */
+      function primeDecoder() {
+        if (video.readyState >= 2) {
+          return;
+        }
+        var attempt = video.play();
+        if (attempt && typeof attempt.then === "function") {
+          attempt.then(function () {
+            video.pause();
+            needsDraw = true;
+          }).catch(function () {});
+        }
+      }
+
+      /* Respaldo: algunos navegadores móviles sólo cargan tras un gesto del usuario */
+      function unlockOnGesture() {
+        primeDecoder();
+        window.removeEventListener("touchstart", unlockOnGesture);
+        window.removeEventListener("pointerdown", unlockOnGesture);
+      }
+      window.addEventListener("touchstart", unlockOnGesture, { passive: true });
+      window.addEventListener("pointerdown", unlockOnGesture, { passive: true });
 
       /* Carga el archivo completo en memoria para que cualquier salto de tiempo
          sea instantáneo, incluso en servidores sin soporte de peticiones por rangos. */
@@ -2817,7 +2858,7 @@
             var resumeAt = video.currentTime;
             videoReady = false;
             video.addEventListener("loadeddata", function () {
-              video.currentTime = resumeAt;
+              video.currentTime = Math.max(resumeAt, playhead.currentTime);
               videoReady = true;
               needsDraw = true;
             }, { once: true });
@@ -2835,10 +2876,21 @@
       };
       startLoop();
 
+      /* Inicialización en "loadeddata". En iOS ese evento puede no llegar sin
+         reproducción previa, así que "loadedmetadata" arranca el módulo y
+         primeDecoder() se encarga de obtener el primer cuadro. */
       if (video.readyState >= 2) {
         initModule();
       } else {
         video.addEventListener("loadeddata", initModule, { once: true });
+        video.addEventListener("loadedmetadata", function () {
+          if (/iP(hone|ad|od)|Macintosh.*Safari/.test(navigator.userAgent) && !/Chrome|CriOS|FxiOS/.test(navigator.userAgent)) {
+            initModule();
+          }
+        }, { once: true });
+        if (video.readyState >= 1 && video.preload !== "none") {
+          video.load();
+        }
       }
 
       video.addEventListener("error", function () {
