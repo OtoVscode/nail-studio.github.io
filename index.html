@@ -35,7 +35,7 @@
   <meta name="twitter:image" content="https://otovscode.github.io/nail-studio.github.io/hero-poster.jpg" />
   <meta name="twitter:image:alt" content="Manos con manicura nude y detalles dorados en Maison Nails" />
 
-  <link rel="preload" as="image" href="frames/frame_0001.webp" type="image/webp" fetchpriority="high" />
+  <link rel="preload" as="image" href="hero-poster.jpg" fetchpriority="high" />
 
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -201,6 +201,9 @@
       text-size-adjust: 100%;
       scroll-behavior: smooth;
       scroll-padding-top: var(--header-h);
+      /* Sin rebote elástico. El overflow-x: hidden va sólo en <body>: si también
+         se pone en <html>, el body se vuelve contenedor de scroll y rompe el sticky. */
+      overscroll-behavior-y: none;
     }
 
     body {
@@ -668,17 +671,18 @@
     }
 
     /* ==========================================================
-       Hero: secuencia de fotogramas en canvas atada al scroll
+       Hero: video continuo pintado en canvas y controlado por scroll
        ========================================================== */
-    #hero-scroll {
+    #scroll-container {
       position: relative;
       height: 400vh;
       background: #14120F;
-      /* "clip" recorta sin crear un contenedor de scroll, así el sticky sigue funcionando */
+      /* "clip" recorta igual que hidden pero sin crear un contenedor de scroll
+         propio: así no aparece una barra secundaria y el sticky sigue funcionando */
       overflow-x: clip;
     }
 
-    #hero-canvas {
+    #video-canvas {
       position: sticky;
       top: 0;
       display: block;
@@ -686,6 +690,23 @@
       max-width: 100%;
       height: 100vh;
       background: #14120F;
+      will-change: transform;
+      transform: translateZ(0);
+      -webkit-backface-visibility: hidden;
+      backface-visibility: hidden;
+    }
+
+    /* El video fuente sólo alimenta al canvas: queda fuera de la vista pero
+       sigue "renderizable" (display:none detendría la decodificación en Safari) */
+    #source-video {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 2px;
+      height: 2px;
+      opacity: 0;
+      pointer-events: none;
+      z-index: -1;
     }
 
     /* La capa de contenido se superpone al canvas: también es sticky
@@ -1824,12 +1845,11 @@
         transition-duration: 0.001ms !important;
       }
 
-      #hero-scroll {
+      #scroll-container {
         height: 100vh;
-        height: 100svh;
       }
 
-      #hero-canvas,
+      #video-canvas,
       .hero-sticky {
         height: 100vh;
       }
@@ -1858,7 +1878,7 @@
   <!-- ======================= HEADER ======================= -->
   <header class="site-header" id="siteHeader">
     <div class="container header-inner">
-      <a href="#hero-scroll" class="logo" aria-label="Maison Nails, ir al inicio">
+      <a href="#scroll-container" class="logo" aria-label="Maison Nails, ir al inicio">
         <span>Maison <span class="logo-mark">Nails</span></span>
         <small>CDMX</small>
       </a>
@@ -1892,8 +1912,9 @@
 
   <main id="main">
     <!-- ======================= HERO SCROLL ======================= -->
-    <section id="hero-scroll" aria-label="Presentación de Maison Nails">
-      <canvas id="hero-canvas" role="img" aria-label="Secuencia de manicura de lujo: diseños nude, cromo, ónix y nail art de autor"></canvas>
+    <section id="scroll-container" aria-label="Presentación de Maison Nails">
+      <canvas id="video-canvas" role="img" aria-label="Video de manicura de lujo: diseños nude, cromo, ónix y nail art de autor"></canvas>
+      <video id="source-video" preload="auto" playsinline muted src="render-highres.mp4" aria-hidden="true" tabindex="-1" disablepictureinpicture disableremoteplayback></video>
 
       <div class="hero-sticky">
         <div class="hero-scrim" aria-hidden="true"></div>
@@ -2259,7 +2280,7 @@
     <div class="container">
       <div class="footer-grid">
         <div class="footer-brand">
-          <a href="#hero-scroll" class="logo">Maison <span class="logo-mark">Nails</span></a>
+          <a href="#scroll-container" class="logo">Maison <span class="logo-mark">Nails</span></a>
           <p>Atelier de manicura de alta gama en Roma Norte. Higiene clínica, fórmulas no tóxicas y diseño de autor.</p>
         </div>
 
@@ -2375,7 +2396,7 @@
       var header = document.getElementById("siteHeader");
       var menuToggle = document.getElementById("menuToggle");
       var mobileMenu = document.getElementById("mobileMenu");
-      var heroSection = document.getElementById("hero-scroll");
+      var heroSection = document.getElementById("scroll-container");
       var waFloat = document.getElementById("waFloat");
 
       function setMenu(open) {
@@ -2502,19 +2523,20 @@
       }
 
       /* ----------------------------------------------------------
-         Motor de secuencia de fotogramas en canvas
+         Módulo de video continuo controlado por scroll (Canvas + GSAP)
          ---------------------------------------------------------- */
-      var FRAME_COUNT = 150;
-      var FRAME_DIR = "frames/";
+      var MAX_DPR = 3;
       var ZOOM_START = 1.06;
       var FOCAL_Y = 0.55;
+      /* Diferencia mínima (en segundos) para pedir un nuevo cuadro al decodificador */
+      var SEEK_EPSILON = 1 / 120;
 
-      function framePath(index) {
-        return FRAME_DIR + "frame_" + String(index + 1).padStart(4, "0") + ".webp";
-      }
-
-      var canvas = document.getElementById("hero-canvas");
+      var canvas = document.getElementById("video-canvas");
       var ctx = canvas.getContext("2d", { alpha: false });
+      var video = document.getElementById("source-video");
+      var poster = new Image();
+      poster.src = "hero-poster.jpg";
+
       var progressBar = document.getElementById("heroProgress");
       var chapters = document.querySelectorAll("#heroChapters li");
       var scrollIndicator = document.getElementById("scrollIndicator");
@@ -2525,38 +2547,35 @@
         document.getElementById("heroActions")
       ];
 
-      var images = new Array(FRAME_COUNT);
-      var loaded = new Array(FRAME_COUNT);
-      var sequence = { frame: 0 };
+      /* "playhead" es el objetivo que GSAP anima con inercia (scrub);
+         el bucle de rAF lo vuelca en video.currentTime sin saturar al decodificador. */
+      var playhead = { currentTime: 0 };
       var heroProgress = 0;
-      var rafId = null;
-      var lastDrawn = { frame: -1, width: 0, height: 0, zoom: 0 };
-      var frameTween = null;
+      var needsDraw = true;
+      var loopId = null;
+      var heroVisible = true;
+      var videoReady = false;
+      var moduleInitialized = false;
+      var timeTween = null;
       var copyTimeline = null;
       var introTween = null;
       var nativeScrollHandler = null;
 
-      function isLoaded(index) {
-        return loaded[index] === true;
-      }
+      /* ---------- Resolución nítida en pantallas Retina ---------- */
+      function resizeCanvas() {
+        var dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
+        var rect = canvas.getBoundingClientRect();
+        var width = Math.max(1, Math.round(rect.width * dpr));
+        var height = Math.max(1, Math.round(rect.height * dpr));
 
-      /* Si el fotograma pedido aún no ha llegado, usa el cargado más cercano:
-         nunca se dibuja un hueco negro ni un fotograma a medias. */
-      function nearestLoadedFrame(index) {
-        if (isLoaded(index)) {
-          return index;
+        if (canvas.width !== width || canvas.height !== height) {
+          canvas.width = width;
+          canvas.height = height;
+          /* Redimensionar reinicia el estado del contexto */
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = "high";
         }
-        for (var offset = 1; offset < FRAME_COUNT; offset++) {
-          var before = index - offset;
-          var after = index + offset;
-          if (before >= 0 && isLoaded(before)) {
-            return before;
-          }
-          if (after < FRAME_COUNT && isLoaded(after)) {
-            return after;
-          }
-        }
-        return -1;
+        needsDraw = true;
       }
 
       function currentZoom() {
@@ -2566,104 +2585,77 @@
         return ZOOM_START - (ZOOM_START - 1) * heroProgress;
       }
 
-      /* Ajusta el búfer del canvas a su tamaño en pantalla × densidad de píxeles
-         (máx. 2x) para que se vea nítido sin desperdiciar memoria. */
-      function resizeCanvas() {
-        var dpr = Math.min(window.devicePixelRatio || 1, 2);
-        var rect = canvas.getBoundingClientRect();
-        var width = Math.max(1, Math.round(rect.width * dpr));
-        var height = Math.max(1, Math.round(rect.height * dpr));
-
-        if (canvas.width !== width || canvas.height !== height) {
-          canvas.width = width;
-          canvas.height = height;
-          /* Cambiar el tamaño reinicia el contexto: restaurar la calidad de suavizado */
-          ctx.imageSmoothingEnabled = true;
-          ctx.imageSmoothingQuality = "high";
-          lastDrawn.frame = -1;
-        }
-      }
-
-      /* Dibuja el fotograma activo con el mismo comportamiento que object-fit: cover:
-         escala uniforme (misma proporción en ambos ejes), cubre todo el canvas
-         y centra el recorte. Nunca se estira ni se deforma. */
-      function render() {
-        rafId = null;
-
-        var target = clamp(Math.round(sequence.frame), 0, FRAME_COUNT - 1);
-        var index = nearestLoadedFrame(target);
-        if (index === -1) {
-          return;
-        }
-
-        var zoom = currentZoom();
+      /* ---------- Escalado matemático tipo object-fit: cover ----------
+         Un único factor de escala para ambos ejes (sin deformación),
+         suficiente para cubrir todo el canvas, y recorte centrado. */
+      function drawCover(source, sw, sh) {
         var cw = canvas.width;
         var ch = canvas.height;
-
-        if (
-          index === lastDrawn.frame &&
-          cw === lastDrawn.width &&
-          ch === lastDrawn.height &&
-          Math.abs(zoom - lastDrawn.zoom) < 0.0005
-        ) {
-          return;
-        }
-
-        var img = images[index];
-        var iw = img.naturalWidth;
-        var ih = img.naturalHeight;
-        var scale = Math.max(cw / iw, ch / ih) * zoom;
-        var dw = iw * scale;
-        var dh = ih * scale;
+        var scale = Math.max(cw / sw, ch / sh) * currentZoom();
+        var dw = sw * scale;
+        var dh = sh * scale;
         var dx = (cw - dw) / 2;
         var dy = clamp((ch - dh) * FOCAL_Y, ch - dh, 0);
-
-        ctx.drawImage(img, 0, 0, iw, ih, dx, dy, dw, dh);
-
-        lastDrawn.frame = index;
-        lastDrawn.width = cw;
-        lastDrawn.height = ch;
-        lastDrawn.zoom = zoom;
+        ctx.drawImage(source, 0, 0, sw, sh, dx, dy, dw, dh);
       }
 
-      function scheduleRender() {
-        if (rafId === null) {
-          rafId = requestAnimationFrame(render);
+      function drawFrame() {
+        if (videoReady && video.readyState >= 2 && video.videoWidth) {
+          drawCover(video, video.videoWidth, video.videoHeight);
+          return true;
+        }
+        if (poster.complete && poster.naturalWidth) {
+          drawCover(poster, poster.naturalWidth, poster.naturalHeight);
+          return true;
+        }
+        return false;
+      }
+
+      /* ---------- Bucle continuo de sincronización ----------
+         1. Si el objetivo de GSAP se alejó del cuadro actual y el decodificador
+            está libre, pide el nuevo instante (nunca encadena seeks).
+         2. Si hay un cuadro nuevo listo (o cambió el tamaño), lo pinta. */
+      function syncLoop() {
+        loopId = requestAnimationFrame(syncLoop);
+
+        if (videoReady && !video.seeking) {
+          var target = clamp(playhead.currentTime, 0, video.duration || 0);
+          if (Math.abs(video.currentTime - target) > SEEK_EPSILON) {
+            video.currentTime = target;
+          }
+        }
+
+        if (needsDraw && drawFrame()) {
+          needsDraw = false;
         }
       }
 
-      /* Precarga: el primer fotograma tiene prioridad y se dibuja en cuanto llega;
-         el resto se carga en orden y redibuja si es el que el scroll está pidiendo. */
-      function preloadFrames() {
-        for (var i = 0; i < FRAME_COUNT; i++) {
-          (function (index) {
-            var img = new Image();
-            img.decoding = "async";
-            if (index === 0) {
-              img.fetchPriority = "high";
-            }
-            img.onload = function () {
-              var finish = function () {
-                loaded[index] = true;
-                var wanted = clamp(Math.round(sequence.frame), 0, FRAME_COUNT - 1);
-                if (index === 0 || index === wanted || Math.abs(index - wanted) < Math.abs(lastDrawn.frame - wanted)) {
-                  scheduleRender();
-                }
-              };
-              /* decode() evita el tirón de decodificar la imagen justo al dibujarla */
-              if (typeof img.decode === "function") {
-                img.decode().then(finish, finish);
-              } else {
-                finish();
-              }
-            };
-            img.onerror = function () {
-              loaded[index] = false;
-            };
-            img.src = framePath(index);
-            images[index] = img;
-          })(i);
+      function startLoop() {
+        if (loopId === null) {
+          loopId = requestAnimationFrame(syncLoop);
         }
+      }
+
+      function stopLoop() {
+        if (loopId !== null) {
+          cancelAnimationFrame(loopId);
+          loopId = null;
+        }
+      }
+
+      /* Marca para repintar cada vez que el decodificador entrega un cuadro.
+         requestVideoFrameCallback es exacto al cuadro; "seeked" es el respaldo. */
+      function watchDecodedFrames() {
+        if (typeof video.requestVideoFrameCallback === "function") {
+          var onFrame = function () {
+            needsDraw = true;
+            video.requestVideoFrameCallback(onFrame);
+          };
+          video.requestVideoFrameCallback(onFrame);
+        }
+        video.addEventListener("seeked", function () {
+          needsDraw = true;
+        });
       }
 
       function updateChapters(progress) {
@@ -2678,32 +2670,33 @@
         progressBar.style.transform = "scaleX(" + progress.toFixed(4) + ")";
         updateChapters(progress);
         scrollIndicator.style.opacity = progress > 0.04 ? "0" : "1";
+        needsDraw = true;
       }
 
-      /* Scroll → fotograma con GSAP: scrub 0.5 da inercia suave al frenar,
-         y snap a entero garantiza que siempre se pinta un fotograma completo. */
-      function initScrollSequence() {
-        frameTween = gsap.to(sequence, {
-          frame: FRAME_COUNT - 1,
-          snap: "frame",
+      /* ---------- GSAP ScrollTrigger: currentTime de 0 a duration ----------
+         scrub: 1.2 hace que el tiempo siga al scroll con inercia: al frenar,
+         desacelera suavemente hasta detenerse en un cuadro exacto. */
+      function initScrollControl() {
+        var endTime = Math.max(video.duration - 0.04, 0);
+
+        timeTween = gsap.fromTo(playhead, { currentTime: 0 }, {
+          currentTime: endTime,
           ease: "none",
           scrollTrigger: {
-            trigger: "#hero-scroll",
+            trigger: "#scroll-container",
             start: "top top",
             end: "bottom bottom",
-            scrub: 0.5,
+            scrub: 1.2,
             invalidateOnRefresh: true,
             onUpdate: function (self) {
               updateHeroUI(self.progress);
-              scheduleRender();
             }
-          },
-          onUpdate: scheduleRender
+          }
         });
 
         copyTimeline = gsap.timeline({
           scrollTrigger: {
-            trigger: "#hero-scroll",
+            trigger: "#scroll-container",
             start: "top top",
             end: "bottom bottom",
             scrub: 0.8
@@ -2733,35 +2726,31 @@
         ScrollTrigger.refresh();
       }
 
-      /* Respaldo si el CDN de GSAP no carga: mismo mapeo scroll → fotograma */
-      function initNativeSequence() {
+      /* Respaldo si el CDN de GSAP no carga: mismo mapeo scroll → tiempo, sin inercia */
+      function initNativeScrollControl() {
+        var endTime = Math.max(video.duration - 0.04, 0);
         nativeScrollHandler = function () {
           var rect = heroSection.getBoundingClientRect();
           var total = heroSection.offsetHeight - window.innerHeight;
           var progress = total > 0 ? clamp(-rect.top / total, 0, 1) : 0;
-          sequence.frame = progress * (FRAME_COUNT - 1);
+          playhead.currentTime = progress * endTime;
           updateHeroUI(progress);
-          scheduleRender();
         };
         window.addEventListener("scroll", nativeScrollHandler, { passive: true });
         nativeScrollHandler();
       }
 
-      function teardownSequence() {
-        if (frameTween) {
-          if (frameTween.scrollTrigger) {
-            frameTween.scrollTrigger.kill();
+      function teardownScrollControl() {
+        [timeTween, copyTimeline].forEach(function (anim) {
+          if (anim) {
+            if (anim.scrollTrigger) {
+              anim.scrollTrigger.kill();
+            }
+            anim.kill();
           }
-          frameTween.kill();
-          frameTween = null;
-        }
-        if (copyTimeline) {
-          if (copyTimeline.scrollTrigger) {
-            copyTimeline.scrollTrigger.kill();
-          }
-          copyTimeline.kill();
-          copyTimeline = null;
-        }
+        });
+        timeTween = null;
+        copyTimeline = null;
         if (introTween) {
           introTween.kill();
           introTween = null;
@@ -2775,34 +2764,90 @@
         }
       }
 
-      /* Movimiento reducido: sin scrub, el hero muestra un fotograma fijo */
+      /* Movimiento reducido: sin scrub, el hero muestra el primer cuadro fijo */
       function initReducedMotion() {
-        teardownSequence();
-        sequence.frame = 0;
+        teardownScrollControl();
+        playhead.currentTime = 0;
         updateHeroUI(0);
         progressBar.style.transform = "scaleX(0)";
         scrollIndicator.style.opacity = "0";
-        lastDrawn.frame = -1;
-        scheduleRender();
       }
 
-      function startSequence() {
-        teardownSequence();
+      function applyMotionMode() {
+        teardownScrollControl();
         if (reduceMotionQuery.matches) {
           initReducedMotion();
-          return;
-        }
-        if (hasGSAP) {
-          initScrollSequence();
+        } else if (hasGSAP) {
+          initScrollControl();
         } else {
-          initNativeSequence();
+          initNativeScrollControl();
         }
-        lastDrawn.frame = -1;
-        scheduleRender();
+        needsDraw = true;
       }
 
-      /* Redimensionado: recalcula el búfer y redibuja el fotograma activo
-         en el mismo frame de pintura, sin parpadeos. */
+      /* ---------- Inicialización tras "loadeddata" ---------- */
+      function initModule() {
+        if (moduleInitialized) {
+          return;
+        }
+        moduleInitialized = true;
+        videoReady = true;
+        video.pause();
+        resizeCanvas();
+        watchDecodedFrames();
+        applyMotionMode();
+        startLoop();
+        bufferVideoAsBlob();
+      }
+
+      /* Carga el archivo completo en memoria para que cualquier salto de tiempo
+         sea instantáneo, incluso en servidores sin soporte de peticiones por rangos. */
+      function bufferVideoAsBlob() {
+        if (!window.fetch || !window.URL || video.src.indexOf("blob:") === 0) {
+          return;
+        }
+        fetch(video.currentSrc || video.getAttribute("src"))
+          .then(function (res) {
+            if (!res.ok) {
+              throw new Error("HTTP " + res.status);
+            }
+            return res.blob();
+          })
+          .then(function (blob) {
+            var resumeAt = video.currentTime;
+            videoReady = false;
+            video.addEventListener("loadeddata", function () {
+              video.currentTime = resumeAt;
+              videoReady = true;
+              needsDraw = true;
+            }, { once: true });
+            video.src = URL.createObjectURL(blob);
+            video.load();
+          })
+          .catch(function () {});
+      }
+
+      /* Mientras el video carga, el canvas muestra el póster a máxima nitidez */
+      resizeCanvas();
+      poster.onload = function () {
+        needsDraw = true;
+        startLoop();
+      };
+      startLoop();
+
+      if (video.readyState >= 2) {
+        initModule();
+      } else {
+        video.addEventListener("loadeddata", initModule, { once: true });
+      }
+
+      video.addEventListener("error", function () {
+        /* Sin video: el póster se mantiene pintado en el canvas */
+        videoReady = false;
+        needsDraw = true;
+      });
+
+      /* ---------- Redimensionado sin saltos ---------- */
       var resizeRaf = null;
       function onResize() {
         if (resizeRaf !== null) {
@@ -2811,24 +2856,57 @@
         resizeRaf = requestAnimationFrame(function () {
           resizeRaf = null;
           resizeCanvas();
-          if (rafId !== null) {
-            cancelAnimationFrame(rafId);
+          if (drawFrame()) {
+            needsDraw = false;
           }
-          render();
         });
       }
-
       window.addEventListener("resize", onResize);
       window.addEventListener("orientationchange", onResize);
 
-      resizeCanvas();
-      preloadFrames();
-      startSequence();
+      /* Si cambia la densidad de píxeles (mover la ventana a otro monitor, zoom) */
+      function watchPixelRatio() {
+        if (!window.matchMedia) {
+          return;
+        }
+        var mq = window.matchMedia("(resolution: " + (window.devicePixelRatio || 1) + "dppx)");
+        var handler = function () {
+          onResize();
+          watchPixelRatio();
+        };
+        if (typeof mq.addEventListener === "function") {
+          mq.addEventListener("change", handler, { once: true });
+        }
+      }
+      watchPixelRatio();
+
+      /* Ahorra batería: el bucle sólo corre mientras el hero está en pantalla */
+      if ("IntersectionObserver" in window) {
+        new IntersectionObserver(function (entries) {
+          entries.forEach(function (entry) {
+            heroVisible = entry.isIntersecting;
+            if (heroVisible) {
+              needsDraw = true;
+              startLoop();
+            } else {
+              stopLoop();
+            }
+          });
+        }).observe(heroSection);
+      }
 
       if (typeof reduceMotionQuery.addEventListener === "function") {
-        reduceMotionQuery.addEventListener("change", startSequence);
+        reduceMotionQuery.addEventListener("change", function () {
+          if (moduleInitialized) {
+            applyMotionMode();
+          }
+        });
       } else if (typeof reduceMotionQuery.addListener === "function") {
-        reduceMotionQuery.addListener(startSequence);
+        reduceMotionQuery.addListener(function () {
+          if (moduleInitialized) {
+            applyMotionMode();
+          }
+        });
       }
 
       /* ----------------------------------------------------------
